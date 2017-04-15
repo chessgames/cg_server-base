@@ -13,7 +13,9 @@ CG_Database::CG_Database(QObject *parent)
 {
 
     m_dbUser = QSqlDatabase::addDatabase("QSQLITE");
-    m_dbUser.setConnectOptions(QStringLiteral("QSQLITE_OPEN_URI=file:/srv/CG/user.db")); // hardcoded for now
+    m_dbUser.setHostName("CG");
+    m_dbUser.setDatabaseName("/srv/CG/user.sqlite");
+    m_dbUser.setConnectOptions();
 #ifdef CG_TEST_ENABLED
     Q_VERIFY(m_dbUser.open());
 #else

@@ -56,6 +56,7 @@ public:
     int getPlayerCount();
     int getMatchCount();
     int getQueueCount();
+    void closeServer();
     ~CG_Server();
 signals:
     void playersReadyToBeMatched();

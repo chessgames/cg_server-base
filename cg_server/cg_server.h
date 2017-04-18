@@ -51,8 +51,8 @@ class CG_Server : public QObject
 {
     Q_OBJECT
 public:
-    explicit CG_Server(QObject *parent = nullptr);
-    bool startToListen(QHostAddress addr, quint16 port);
+    explicit CG_Server(QString db_path, QObject *parent = nullptr);
+    void startToListen(QHostAddress addr, quint16 port, bool error);
     int getPlayerCount();
     int getMatchCount();
     int getQueueCount();

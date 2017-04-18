@@ -1,26 +1,42 @@
 #include "cg_database.h"
 #include <QSqlQuery>
-
+#include <QDir>
 #include <QDebug>
-
+#include <QFileInfo>
+#include <QSqlError>
+#include <QSqlRecord>
 #ifdef CG_TEST_ENABLED
 #include <QtTest/QTest>
 #endif
 
 
-CG_Database::CG_Database(QObject *parent)
-    : QObject(parent)
+CG_Database::CG_Database(QString user_db_path, QObject *parent)
+    : QObject(parent), m_UserDBPath(user_db_path)
 {
-
     m_dbUser = QSqlDatabase::addDatabase("QSQLITE");
     m_dbUser.setHostName("CG");
-    m_dbUser.setDatabaseName("/srv/CG/user.sqlite");
-    m_dbUser.setConnectOptions();
+    if(!databaseExists(user_db_path)){
+        #ifndef CG_TEST_ENABLED
+        createUserDatabase();
+        #endif
+    }
+    else{
+        m_dbUser.setDatabaseName(user_db_path);
+        // test db exists
 #ifdef CG_TEST_ENABLED
-    Q_VERIFY(m_dbUser.open());
+        QVERIFY(m_dbUser.isValid());
 #else
-    Q_ASSERT(m_dbUser.open());
+        Q_ASSERT(m_dbUser.isValid());
+        m_dbUser.setConnectOptions();
+        // test db connection will open
+    #ifdef CG_TEST_ENABLED
+        QVERIFY(m_dbUser.open());
+    #else
+        Q_ASSERT(m_dbUser.open());
+    #endif
 #endif
+    }
+
     qDebug() << "User Database open.";
 }
 
@@ -32,15 +48,19 @@ CG_Database::CG_Database(QObject *parent)
 *
 *     Exit:  Returns whether or not the user exists.
 ****************************************************************/
-bool CG_Database::userExists(QString str_username)
+void CG_Database::userExists(QString str_username, bool &found)
 {
     QSqlQuery qry( m_dbUser );
     qry.prepare( "SELECT * FROM CG_user WHERE Username= ?;" );
     qry.addBindValue(str_username);
-    int username_count(0);
-    if(qry.exec())
-        for (; qry.next(); username_count++);
-    return username_count > 0;
+    qry.exec();
+    QSqlError err = qry.lastError();
+#ifdef CG_TEST_ENABLED
+    QCOMPARE(err.isValid(),false);
+#else
+    Q_ASSERT(!qry.lastError().isValid());
+#endif
+    found = !err.isValid();
 }
 
 
@@ -53,41 +73,164 @@ bool CG_Database::userExists(QString str_username)
 *     Exit:  Returns whether or not the user was successfully
 *            added into the database.
 ****************************************************************/
-
-bool CG_Database::addUser(QString str_username, QString str_password, QString str_email)
+#ifndef CG_TEST_ENABLED
+void CG_Database::addUser(QString str_username, QByteArray pass, QString str_email, bool &error)
 {
-
-    if(userExists(str_username)){
-        return false; // cannot add user that already exists
+    userExists(str_username,error);
+    if(error){
+        return; // cannot add user that already exists
     }
 
     bool added_user(false);
     int user_id(-1); // should be set to an invalid id
 
     QSqlQuery qry( m_dbUser);
-    qry.prepare( "INSERT INTO CG_user (Username, Passwd, Email) VALUES(?, ?, ?);" );
+    // create settings object
+    updateCurrentELO(str_username,0);
+    QString data = "";// setting_object.toJson();
+    qry.prepare( "INSERT INTO CG_User (name, pass, email, data) VALUES(?, ?, ?,?);" );
     qry.addBindValue(str_username);
-    qry.addBindValue(str_password);
+    qry.addBindValue(pass);
     qry.addBindValue(str_email);
+    qry.addBindValue(data);
 
-    if(qry.exec()){
-        added_user = true;
-        qry.prepare("SELECT UserID FROM CG_user WHERE Username = ?");
-        qry.addBindValue(str_username);
-
-        if(qry.exec()){
-            for (int count = 0; qry.next(); count++){
-                user_id = qry.value(0).toInt(); // could be zero
-            }
-        }
-        if(user_id != -1){
-            qry.prepare( "INSERT INTO CG_settings (sound, auto_promotion, arrows, boardCoordinates, pieceSet, UserID) VALUES (1,1,1,1,1,?);" );
-            qry.addBindValue(user_id);
-            added_user = qry.exec();
-        }
-        updateCurrentELO(str_username,0);
+#ifdef CG_TEST_ENABLED
+    QVERIFY(qry.exec());
+#endif
+    added_user = true;
+    qry.prepare("SELECT id FROM CG_User WHERE name = ?");
+    qry.addBindValue(str_username);
+#ifdef CG_TEST_ENABLED
+    QVERIFY(qry.exec());
+#endif
+    QSqlError err = qry.lastError();
+    if(err.isValid()){
+        error = false;
+        return;
     }
-    return added_user;
+    else
+    {
+        user_id = qry.value(0).toInt();
+        qDebug() << "Bad User Id found in DB @ "<< user_id <<" for " << str_username;
+    }
+}
+
+#else
+void CG_Database::addUser_data()
+{
+    QTest::addColumn<QString>("str_username");
+    QTest::addColumn<QString>("pass");
+    QTest::addColumn<QString>("str_email");
+
+    QTest::newRow("StarWars") << "StarWas" << "starwars1" << "sw@stu.com";
+    QTest::newRow("Tpimp")     << "Tpimp" << "pass" << "tpimp@tester.com";
+    QTest::newRow("test user") << "Test" << "test" << "test@user.com";
+}
+
+void CG_Database::addUser()
+{
+
+    QFETCH(QString, str_username);
+    QFETCH(QString, pass);
+    QFETCH(QString, str_email);
+    bool error(false);
+    //userExists(str_username,error);
+    if(error){
+        return; // cannot add user that already exists
+    }
+
+    bool added_user(false);
+    int user_id(-1); // should be set to an invalid id
+
+    QSqlQuery qry( m_dbUser);
+    // create settings object
+    updateCurrentELO(str_username,0);
+    QString data = "";// setting_object.toJson();
+    qry.prepare( "INSERT INTO CG_User (name, pass, email, data) VALUES(?, ?, ?,?);" );
+    qry.addBindValue(str_username);
+    qry.addBindValue(pass);
+    qry.addBindValue(str_email);
+    qry.addBindValue(data);
+
+#ifdef CG_TEST_ENABLED
+    QVERIFY(qry.exec());
+#endif
+    added_user = true;
+    qry.prepare("SELECT * FROM CG_User WHERE name = ?");
+    qry.addBindValue(str_username);
+#ifdef CG_TEST_ENABLED
+    QVERIFY(qry.exec());
+#endif
+    QSqlError err = qry.lastError();
+    if(err.isValid()){
+        error = false;
+        return;
+    }
+    else
+    {
+        QSqlRecord record = qry.record();
+        qDebug() << "Bad User Id found in DB @ "<< record.value(0).toInt() <<" for " << record.value(1).toString();
+        qDebug() << record;
+    }
+}
+#endif
+void CG_Database::createUserDatabase()
+{
+    QFileInfo f(m_UserDBPath);
+    QString path_to_file = f.absolutePath();
+    QFileInfo fdir(path_to_file);
+    if( fdir.isDir() && fdir.isWritable()){
+        m_dbUser.setDatabaseName(m_UserDBPath);
+        #ifdef CG_TEST_ENABLED
+            QVERIFY(m_dbUser.isValid());
+        #else
+            Q_ASSERT(m_dbUser.isValid());
+        #endif
+        m_dbUser.setConnectOptions();
+        // test db connection will open
+        #ifdef CG_TEST_ENABLED
+            QVERIFY(m_dbUser.open());
+        #else
+            Q_ASSERT(m_dbUser.open());
+        #endif
+    #ifndef CG_TEST_ENABLED
+            createUserTables();
+    #endif
+    }
+}
+
+void CG_Database::createUserTables()
+{
+
+    QSqlQuery create_user_tbl(m_dbUser);
+    create_user_tbl.prepare("CREATE TABLE CG_User (id INT PRIMARY KEY NOT NULL, name TEXT, pass BLOB , email TEXT, data TEXT);");
+    create_user_tbl.exec();
+    QSqlError err = m_dbUser.lastError();
+#ifdef CG_TEST_ENABLED
+    QVERIFY(!err.isValid());
+#else
+    Q_ASSERT(!err.isValid());
+#endif
+}
+
+
+void CG_Database::createMatchTables()
+{
+
+    QSqlQuery create_match_tbl("CREATE TABLE CG_User(id INT PRIMARY KEY NOT NULL, white INT, black INT , date TEXT, data TEXT);");
+    create_match_tbl.exec();
+    QSqlError err = m_dbUser.lastError();
+#ifdef CG_TEST_ENABLED
+    QVERIFY(!err.isValid());
+#else
+    Q_ASSERT(!err.isValid());
+#endif
+}
+
+bool CG_Database::databaseExists(QString path)
+{
+    QDir file(path);
+    return file.exists();
 }
 
 /**************************************************************
@@ -212,7 +355,9 @@ CG_User CG_Database::getUserInfo(QString str_username)
 {
 
     CG_User user_info;
-    if(!userExists(str_username)){
+    bool error(false);
+    userExists(str_username,error);
+    if(error){
         return user_info;
     }
     QSqlQuery qry( m_dbUser);
@@ -252,7 +397,9 @@ CG_User CG_Database::getUserInfo(QString str_username)
 
 bool CG_Database::updateUserInfo(CG_User user)
 {
-    if(!userExists(user.username)){
+    bool error(false);
+    userExists(user.username,error);
+    if(error){
         return false;
     }
 

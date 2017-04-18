@@ -1,29 +1,40 @@
 #include "cg_server.h"
 #include <QWebSocketServer>
 #include "cg_database.h"
-CG_Server::CG_Server(QObject *parent) : QObject(parent), m_db(parent), m_server(nullptr)
+
+#ifdef CG_TEST_ENABLED
+#include <QtTest/QTest>
+#endif
+
+CG_Server::CG_Server(QString db_path,QObject *parent) : QObject(parent), m_db(db_path,parent), m_server(nullptr)
 {
     m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
     m_lobbies.insert(QStringLiteral("1M"),CG_PlayerList());
     m_lobbies.insert(QStringLiteral("5M"),CG_PlayerList());
     m_lobbies.insert(QStringLiteral("30M"),CG_PlayerList());
+#ifdef CG_TEST_ENABLED
+    QTest::qExec(&m_db, 0, nullptr);
+#endif
 }
 
-bool CG_Server::startToListen(QHostAddress addr, quint16 port)
+void CG_Server::startToListen(QHostAddress addr, quint16 port, bool error)
 {
     if(m_server == nullptr){
         m_server = new QWebSocketServer("CG_Server",QWebSocketServer::NonSecureMode,this); // http connection
     }
-    Q_ASSERT(m_server);
-    bool listening(m_server->listen(addr,port));
-    if(!listening){
+    #ifdef CG_TEST_ENABLED
+            QVERIFY(m_server);
+    #else
+            Q_ASSERT(m_server);
+    #endif
+    error = !m_server->listen(addr,port);
+    if(error){
         qDebug() << "Failed to start the server for: " << addr << " @ " << port;
         Q_ASSERT(m_server->isListening());
     }
     else{
         qDebug() << "Started the server on: " << addr << " @ " << port;
     }
-    return listening;
 }
 
 void CG_Server::closeServer()

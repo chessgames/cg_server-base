@@ -4,6 +4,8 @@
 #include <QObject>
 #include "cg_global.h"
 #include <QSqlDatabase>
+#include <QString>
+
 /******************************************************************************
 * Class: CG_dbManager
 *
@@ -36,12 +38,11 @@ class CG_Database : public QObject
     Q_OBJECT
 public:
 
-    explicit CG_Database(QObject *parent = nullptr);
+    explicit CG_Database(QString user_db_path,QObject *parent = nullptr);
     ~CG_Database();
-
-    bool userExists(QString str_username);
-    bool correctUserInfo(QString str_username, QString str_password);
-    bool addUser(QString str_username, QString str_password, QString str_email);
+    bool databaseExists(QString path);
+    void userExists(QString str_username, bool &found);
+    bool setUserCredentials(QString str_username, QByteArray new_pass, QByteArray old_pass);
     bool updateCountryFlag(QString str_username, int country_flag);
     bool updateUserInfo(CG_User user);
     int getCountryFlag(QString str_username);
@@ -51,10 +52,30 @@ public:
     QString getCurrentELO(QString str_username);
     CG_User getUserInfo(QString str_username);
 
+signals:
+    void databaseLoadComplete();
+    void databaseFinishedTransaction(QString id);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
     QSqlDatabase  m_dbGames; // past games
+    QString       m_UserDBPath;
+    void createMatchTables();
+    void clearUserDatabase();
+#ifdef CG_TEST_ENABLED
+private slots:
+    void createUserDatabase();
+    void createUserTables();
+    void addUser();
+    void addUser_data();
+#else
+public:
+    void createUserDatabase();
+    void createUserTables();
+    void addUser(QString str_username, QByteArray pass, QString str_email, bool &error);
+
+#endif
+
 };
 
 #endif // CG_DATABASE_H

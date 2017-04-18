@@ -62,16 +62,15 @@ protected:
     QString       m_UserDBPath;
     void createMatchTables();
     void clearUserDatabase();
+    void createUserTables();
 #ifdef CG_TEST_ENABLED
 private slots:
     void createUserDatabase();
-    void createUserTables();
     void addUser();
     void addUser_data();
 #else
 public:
     void createUserDatabase();
-    void createUserTables();
     void addUser(QString str_username, QByteArray pass, QString str_email, bool &error);
 
 #endif

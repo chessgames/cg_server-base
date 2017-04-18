@@ -5,6 +5,7 @@
 #include <QFileInfo>
 #include <QSqlError>
 #include <QSqlRecord>
+#include <QSqlResult>
 #ifdef CG_TEST_ENABLED
 #include <QtTest/QTest>
 #endif
@@ -51,16 +52,29 @@ CG_Database::CG_Database(QString user_db_path, QObject *parent)
 void CG_Database::userExists(QString str_username, bool &found)
 {
     QSqlQuery qry( m_dbUser );
-    qry.prepare( "SELECT * FROM CG_user WHERE Username= ?;" );
+    qry.prepare( "SELECT * FROM cg_user WHERE name= ?;" );
     qry.addBindValue(str_username);
     qry.exec();
     QSqlError err = qry.lastError();
+    if(err.isValid()){
 #ifdef CG_TEST_ENABLED
-    QCOMPARE(err.isValid(),false);
+        QVERIFY(false);
 #else
-    Q_ASSERT(!qry.lastError().isValid());
+        Q_ASSERT(err.isValid());
 #endif
-    found = !err.isValid();
+        found = false;
+    }
+    QVERIFY(true);
+    for(;qry.next();){
+
+        QSqlRecord record = qry.record();
+        int id = record.value(0).toInt();
+        QString name = record.value(1).toString();
+        if(id > 0 && (name.compare(str_username) == 0))
+        {
+            found = true;
+        }
+    }
 }
 
 
@@ -94,15 +108,9 @@ void CG_Database::addUser(QString str_username, QByteArray pass, QString str_ema
     qry.addBindValue(str_email);
     qry.addBindValue(data);
 
-#ifdef CG_TEST_ENABLED
-    QVERIFY(qry.exec());
-#endif
     added_user = true;
     qry.prepare("SELECT id FROM CG_User WHERE name = ?");
     qry.addBindValue(str_username);
-#ifdef CG_TEST_ENABLED
-    QVERIFY(qry.exec());
-#endif
     QSqlError err = qry.lastError();
     if(err.isValid()){
         error = false;
@@ -122,9 +130,9 @@ void CG_Database::addUser_data()
     QTest::addColumn<QString>("pass");
     QTest::addColumn<QString>("str_email");
 
-    QTest::newRow("StarWars") << "StarWas" << "starwars1" << "sw@stu.com";
-    QTest::newRow("Tpimp")     << "Tpimp" << "pass" << "tpimp@tester.com";
-    QTest::newRow("test user") << "Test" << "test" << "test@user.com";
+    QTest::newRow("StarWars") <<  "StarWas" << "starwars1" << "sw@stu.com";
+    QTest::newRow("Tpimp")     <<  "Tpimp" << "pass" << "tpimp@tester.com";
+    QTest::newRow("test user") <<  "Test" << "test" << "test@user.com";
 }
 
 void CG_Database::addUser()
@@ -134,33 +142,29 @@ void CG_Database::addUser()
     QFETCH(QString, pass);
     QFETCH(QString, str_email);
     bool error(false);
-    //userExists(str_username,error);
+    userExists(str_username,error);
     if(error){
         return; // cannot add user that already exists
     }
 
     bool added_user(false);
-    int user_id(-1); // should be set to an invalid id
 
     QSqlQuery qry( m_dbUser);
     // create settings object
-    updateCurrentELO(str_username,0);
+    //updateCurrentELO(str_username,0);
     QString data = "";// setting_object.toJson();
-    qry.prepare( "INSERT INTO CG_User (name, pass, email, data) VALUES(?, ?, ?,?);" );
+    qry.prepare( "INSERT INTO cg_user (name, pass, email, data) VALUES(?, ?, ?, ?);" );
     qry.addBindValue(str_username);
     qry.addBindValue(pass);
     qry.addBindValue(str_email);
     qry.addBindValue(data);
 
-#ifdef CG_TEST_ENABLED
     QVERIFY(qry.exec());
-#endif
+
     added_user = true;
-    qry.prepare("SELECT * FROM CG_User WHERE name = ?");
+    qry.prepare("SELECT * FROM cg_user WHERE name LIKE ?");
     qry.addBindValue(str_username);
-#ifdef CG_TEST_ENABLED
     QVERIFY(qry.exec());
-#endif
     QSqlError err = qry.lastError();
     if(err.isValid()){
         error = false;
@@ -168,9 +172,11 @@ void CG_Database::addUser()
     }
     else
     {
-        QSqlRecord record = qry.record();
-        qDebug() << "Bad User Id found in DB @ "<< record.value(0).toInt() <<" for " << record.value(1).toString();
-        qDebug() << record;
+        int count(0);
+        for(;qry.next();count++){
+            QSqlRecord record = qry.record();
+            qDebug() << record;
+        }
     }
 }
 #endif
@@ -193,9 +199,7 @@ void CG_Database::createUserDatabase()
         #else
             Q_ASSERT(m_dbUser.open());
         #endif
-    #ifndef CG_TEST_ENABLED
             createUserTables();
-    #endif
     }
 }
 
@@ -203,7 +207,7 @@ void CG_Database::createUserTables()
 {
 
     QSqlQuery create_user_tbl(m_dbUser);
-    create_user_tbl.prepare("CREATE TABLE CG_User (id INT PRIMARY KEY NOT NULL, name TEXT, pass BLOB , email TEXT, data TEXT);");
+    create_user_tbl.prepare("CREATE TABLE cg_user (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pass BLOB , email TEXT, data TEXT);");
     create_user_tbl.exec();
     QSqlError err = m_dbUser.lastError();
 #ifdef CG_TEST_ENABLED
@@ -217,7 +221,7 @@ void CG_Database::createUserTables()
 void CG_Database::createMatchTables()
 {
 
-    QSqlQuery create_match_tbl("CREATE TABLE CG_User(id INT PRIMARY KEY NOT NULL, white INT, black INT , date TEXT, data TEXT);");
+    QSqlQuery create_match_tbl("CREATE TABLE cg_match(id INT PRIMARY KEY NOT NULL, white INT, black INT , date TEXT, data TEXT);");
     create_match_tbl.exec();
     QSqlError err = m_dbUser.lastError();
 #ifdef CG_TEST_ENABLED

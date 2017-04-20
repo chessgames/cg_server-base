@@ -5,7 +5,7 @@
 #include "cg_global.h"
 #include <QSqlDatabase>
 #include <QString>
-
+#include <QThread>
 /******************************************************************************
 * Class: CG_dbManager
 *
@@ -31,7 +31,21 @@
 *
 *******************************************************************************/
 
+static const char CG_L[] = "LI";  // Logged in
+static const char CG_BAN[] = "BA";// Banned
+static const char CG_UN[] = "UN"; // Username
+static const char CG_E[] = "EL";  // Elo
+static const char CG_CF[] = "CF"; // Country flag
+static const char CG_PS[] = "PS"; // Piece Set
+static const char CG_LANG[] ="LA";// Language
+static const char CG_SND[] = "SN"; // sound
+static const char CG_CO[] = "CO"; // Co-ordinates
+static const char CG_AR[] = "AR"; // Arrows
+static const char CG_AP[] ="AP"; // Auto Promote
+static const char CG_BT[] ="BT"; // Board Theme
+static const char CG_BF[] ="BF"; // Bit Field
 
+#include <QWebSocket>
 
 class CG_Database : public QObject
 {
@@ -50,11 +64,18 @@ public:
 
     bool updateCurrentELO(QString str_username, int elo);
     QString getCurrentELO(QString str_username);
-    CG_User getUserInfo(QString str_username);
+    void getUserInfo(CG_User &user, QString str_username);
+    static void setUser(CG_User & user, QString name, QString json_settings);
+    static QString serializeUser(const CG_User &user);
 
+    void setToAThread(QThread* thread);
 signals:
     void databaseLoadComplete();
-    void databaseFinishedTransaction(QString id);
+
+    void userVerificationComplete(QWebSocket* socket, bool verified, CG_User data);
+
+public slots:
+    void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
@@ -68,6 +89,9 @@ private slots:
     void createUserDatabase();
     void addUser();
     void addUser_data();
+    void testUserVerify();
+    void testUserVerify_data();
+
 #else
 public:
     void createUserDatabase();

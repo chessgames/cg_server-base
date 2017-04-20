@@ -1,17 +1,29 @@
 #include "cg_server.h"
 #include <QWebSocketServer>
 #include "cg_database.h"
+#include <QWebSocket>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
 
 #ifdef CG_TEST_ENABLED
 #include <QtTest/QTest>
 #endif
 
-CG_Server::CG_Server(QString db_path,QObject *parent) : QObject(parent), m_db(db_path,parent), m_server(nullptr)
+CG_Server::CG_Server(QString db_path,QObject *parent) : QObject(parent), m_db(db_path,nullptr), m_server(nullptr), m_dbThread(nullptr), m_LobbyThread(nullptr)
 {
     m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
-    m_lobbies.insert(QStringLiteral("1M"),CG_PlayerList());
-    m_lobbies.insert(QStringLiteral("5M"),CG_PlayerList());
-    m_lobbies.insert(QStringLiteral("30M"),CG_PlayerList());
+    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
+    m_lobbies.insert(QStringLiteral("5 Minute"),CG_PlayerList());
+    m_lobbies.insert(QStringLiteral("30 Minute"),CG_PlayerList());
+
+    m_dbThread = new QThread(this);
+    m_db.setToAThread(m_dbThread);
+    m_dbThread->start();
+
+    connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials);
+    connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
+
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
 #endif
@@ -27,6 +39,7 @@ void CG_Server::startToListen(QHostAddress addr, quint16 port, bool error)
     #else
             Q_ASSERT(m_server);
     #endif
+    connect(m_server, &QWebSocketServer::newConnection, this, &CG_Server::incommingConnection);
     error = !m_server->listen(addr,port);
     if(error){
         qDebug() << "Failed to start the server for: " << addr << " @ " << port;
@@ -62,11 +75,141 @@ int CG_Server::getQueueCount()
     return m_lobbies.value("1M").count();
 }
 
+
+// Server specific protected slots
+
+
+
+void CG_Server::closePending()
+{
+    QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
+    m_pending.removeAll(socket);
+    socket->abort();
+    socket->deleteLater();
+}
+
+void CG_Server::pendingDisconnected()
+{
+    QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
+    m_pending.removeAll(socket);
+    socket->deleteLater();
+}
+
+void CG_Server::incommingConnection()
+{
+    // get the websocket
+    QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
+    QString ip = socket->peerAddress().toString();
+    if(m_banned.contains(ip)){
+        socket->close(QWebSocketProtocol::CloseCodePolicyViolated,"GTFO Bro");
+    }
+    connect(socket, &QWebSocket::binaryMessageReceived, this, &CG_Server::incommingPendingMessage);
+    connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::closePending);
+    connect(socket,&QWebSocket::disconnected, this, &CG_Server::pendingDisconnected);
+}
+
+
+void CG_Server::incommingDBReply(QString player, QByteArray data)
+{
+
+}
+
+void CG_Server::incommingLobbyReply(QString lobby, QByteArray data)
+{
+
+}
+
+void CG_Server::incommingMatchReply(QString player, QByteArray data)
+{
+
+}
+
+void CG_Server::incommingPendingMessage(QByteArray message)
+{
+    // Login credentials
+    QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
+    QJsonDocument doc = QJsonDocument::fromBinaryData(message);
+    QJsonObject obj = doc.object();
+    if(obj.isEmpty() || doc.isNull() || doc.isEmpty()){
+        return;
+    }
+
+    QString name = obj.value("N").toString();
+    QString pass_str = obj.value("P").toString();
+    QByteArray hpass = pass_str.toLatin1();
+    if(name.isEmpty() || pass_str.isEmpty() || hpass.isEmpty()){
+        return;
+    }
+    emit verifyPlayer(socket,name,hpass);
+}
+
+void CG_Server::incommingVerifiedMessage(QByteArray message)
+{
+    // route a verified player message
+
+}
+
+void CG_Server::playerClosing()
+{
+    QWebSocket * socket = qobject_cast<QWebSocket*>(sender());
+    CG_Player player = m_connected.take(socket);
+    emit notifyPlayerLeaving(player.mUserData.username,player.mConnectedLobbies);
+    emit disconnectPlayer(player);
+    socket->close();
+    socket->abort();
+    socket->deleteLater();
+}
+
+
+void CG_Server::playerDropped()
+{
+    QWebSocket * socket = qobject_cast<QWebSocket*>(sender());
+    CG_Player player = m_connected.take(socket);
+    emit notifyPlayerDropped(player.mUserData.username,player.mConnectedLobbies);
+    socket->disconnect();
+    m_disconnecting.insert(socket,player);
+}
+
+
+void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
+{
+    m_pending.removeAll(socket);
+    if(verified && (!data.username.isEmpty())){
+        CG_Player player;
+        player.mWebSocket = socket;
+        socket->disconnect();
+        connect(socket, &QWebSocket::binaryMessageReceived, this, &CG_Server::incommingPendingMessage);
+        connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::closePending);
+        connect(socket,&QWebSocket::disconnected, this, &CG_Server::pendingDisconnected);
+        player.mUserData = data;
+        m_connected.insert(socket,player);
+    }
+    else{
+        socket->close(QWebSocketProtocol::CloseCodeBadOperation);
+        socket->abort();
+        socket->deleteLater();
+    }
+}
+
+
 CG_Server::~CG_Server(){
     if(m_server){
         qDebug() << "Disconnecting server";
         m_server->close(); // will be deleted by CG_Server (QObject)
         m_server->deleteLater();
     }
-    m_db.deleteLater();
+    if(m_dbThread){
+        m_dbThread->quit();
+        m_dbThread->exit();
+        m_dbThread->deleteLater();
+    }
+    if(m_LobbyThread){
+        m_LobbyThread->quit();
+        m_LobbyThread->exit();
+        m_LobbyThread->deleteLater();
+    }
 }
+
+
+
+

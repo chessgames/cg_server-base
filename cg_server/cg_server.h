@@ -6,11 +6,11 @@
 #include <QMap>
 #include <QString>
 #include <QHostAddress>
-
+#include <QThread>
 #include "cg_database.h"
+#include "cg_player.h"
 class QWebSocketServer;
-class CG_Player;
-typedef QList<CG_Player*> CG_PlayerList;
+typedef QList<CG_Player> CG_PlayerList;
 typedef QMap<QString,CG_PlayerList> CG_Match;
 /************************************************************************
 * Class: CG_Server
@@ -57,9 +57,15 @@ public:
     int getMatchCount();
     int getQueueCount();
     void closeServer();
+    void setToAThread(QThread* thread);
     ~CG_Server();
+
 signals:
     void playersReadyToBeMatched();
+    void verifyPlayer(QWebSocket * socket, QString name, QByteArray hpass);
+    void notifyPlayerDropped(QString name, QStringList lobbies);
+    void notifyPlayerLeaving(QString name, QStringList lobbies);
+    void disconnectPlayer(CG_Player);
 
 public slots:
     /*void clientDisconnected();
@@ -69,11 +75,37 @@ public slots:
     void removePlayerFromQueue();*/
 
 protected:
+    QThread *                   m_dbThread;
+    QThread *                   m_LobbyThread;
 
     CG_Database                 m_db;
     QWebSocketServer           *m_server;
     QMap<QString,CG_PlayerList> m_lobbies;
+    QMap<QWebSocket*, CG_Player>m_connected;
+    QList<QWebSocket*>          m_pending;
+    QMap<QWebSocket*, CG_Player>m_disconnecting;
     QList<CG_Match>             m_matchList;
+    QList<QString>              m_banned;
+
+
+
+protected slots:
+    // server connections
+    void incommingConnection();
+    void incommingPendingMessage(QByteArray message);
+    void incommingVerifiedMessage(QByteArray message);
+
+    void closePending();
+    void pendingDisconnected();
+
+    void incommingDBReply(QString player, QByteArray data);
+    void incommingMatchReply(QString player, QByteArray data);
+    void incommingLobbyReply(QString lobby, QByteArray data);
+
+    void playerClosing();
+    void playerDropped();
+    void userVerified(QWebSocket* socket, bool verified, CG_User data);
+
 };
 
 #endif // CG_SERVER_H

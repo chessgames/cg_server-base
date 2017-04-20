@@ -11,7 +11,10 @@ TEMPLATE = app
 
 SOURCES += main.cpp \
     cg_database.cpp \
-    cg_server.cpp
+    cg_server.cpp \
+    cg_player.cpp \
+    cg_lobby.cpp \
+    cg_lobbymanager.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -20,8 +23,8 @@ SOURCES += main.cpp \
 DEFINES += QT_DEPRECATED_WARNINGS
 
 #uncomment two lines below to ENABLE testing with QtTest
-DEFINES += CG_TEST_ENABLED
-QT += testlib
+#DEFINES += CG_TEST_ENABLED
+#QT += testlib
 
 # You can also make your code fail to compile if you use deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -31,4 +34,7 @@ QT += testlib
 HEADERS += \
     cg_database.h \
     cg_server.h \
-    cg_global.h
+    cg_global.h \
+    cg_player.h \
+    cg_lobby.h \
+    cg_lobbymanager.h

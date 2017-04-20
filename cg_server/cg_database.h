@@ -91,7 +91,6 @@ private slots:
     void addUser_data();
     void testUserVerify();
     void testUserVerify_data();
-
 #else
 public:
     void createUserDatabase();

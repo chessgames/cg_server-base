@@ -105,7 +105,6 @@ void CG_Database::addUser(QString str_username, QByteArray pass, QString str_ema
         return; // cannot add user that already exists
     }
 
-    bool added_user(false);
     int user_id(-1); // should be set to an invalid id
 
     QSqlQuery qry( m_dbUser);
@@ -118,7 +117,7 @@ void CG_Database::addUser(QString str_username, QByteArray pass, QString str_ema
     qry.addBindValue(str_email);
     qry.addBindValue(data);
 
-    added_user = true;
+
     qry.prepare("SELECT id FROM CG_User WHERE name = ?");
     qry.addBindValue(str_username);
     QSqlError err = qry.lastError();
@@ -196,6 +195,60 @@ void CG_Database::addUser()
     }
 }
 
+
+void CG_Database::testUserVerify()
+{
+    QFETCH(QString, username);
+    QFETCH(QByteArray, pass);
+    QFETCH(bool, result);
+    qDebug() << "Testing User Verify " << username << " /w " << pass << result;
+    QSqlQuery qry(m_dbUser);
+    qry.prepare("SELECT * FROM cg_user WHERE name LIKE ? AND pass = ? ");
+    qry.addBindValue(username);
+    qry.addBindValue(pass);
+    CG_User user;
+    if(qry.exec()){
+        if(qry.next()){
+            QSqlRecord record = qry.record();
+            QString user_data = record.value(4).toString();
+            setUser(user,username,user_data);
+        }
+    }
+    // should be comparing an empty string
+
+    int value;
+
+    bool actual_result = user.isValid;
+
+    QVERIFY( actual_result == result);
+    if((value != 0) && result){
+        qDebug() << "Verify success: User Credentials";
+        qDebug() << user;
+    }
+    else{
+        qDebug() << "Verify Failed User doesn't Exist :"<< username << " " << pass;
+    }
+
+}
+
+void CG_Database::testUserVerify_data()
+{
+    QTest::addColumn<QString>("username");
+    QTest::addColumn<QByteArray>("pass");
+    QTest::addColumn<bool>("result");
+    QByteArray encoded_str;
+    encoded_str = QString("afasf323fa").toLatin1();
+    QTest::newRow("Stu") << "Stu" << encoded_str << false;
+    encoded_str = QString("sw1").toLatin1();
+    QTest::newRow("StarWars") <<  "StarWars" << encoded_str << true;
+    encoded_str = QString("fads" ).toLatin1();
+    QTest::newRow("Chris") << "Chris" << encoded_str << false;
+    encoded_str = QString("pass").toLatin1();
+    QTest::newRow("Tpimp")     <<  "Tpimp" << encoded_str << true;
+    encoded_str = QString("test").toLatin1();
+    QTest::newRow("test user") <<  "Test" << encoded_str << true;
+}
+
 #endif
 /**************************************************************
 *	  Purpose:  Updates player elo
@@ -209,7 +262,7 @@ bool CG_Database::updateCurrentELO(QString str_username, int elo)
 {
     bool updateElo = false;
     CG_User user;
-   // int user_id = getUserInfo(user,str_username);
+    //int user_id = getUserInfo(user,str_username);
     if(user.isValid){
         user.elo = elo;
         //updateUserData(user, user_id);
@@ -315,14 +368,14 @@ void CG_Database::verifyUserCredentials(QWebSocket *socket, QString name, QByteA
 {
     QSqlQuery qry(m_dbUser);
     qry.prepare("SELECT * FROM cg_user WHERE name LIKE ? AND pass = ? ");
-    qry.addBindValue(username);
-    qry.addBindValue(pass);
+    qry.addBindValue(name);
+    qry.addBindValue(hpass);
     CG_User user;
     if(qry.exec()){
         if(qry.next()){
             QSqlRecord record = qry.record();
             QString user_data = record.value(4).toString();
-            setUser(user,username,user_data);
+            setUser(user,name,user_data);
             emit userVerificationComplete(socket,true,user);
         }
     }
@@ -492,7 +545,7 @@ void CG_Database::setUser(CG_User &user, QString name, QString json_settings)
     user.autoPromote = obj.value(CG_AP).toBool();
     user.banned = obj.value(CG_BAN).toBool();
     user.boardTheme = obj.value(CG_BT).toString();
-    user.cgbitfield = obj.value(CG_BF).toInt();
+    user.cgbitfield = quint32(obj.value(CG_BF).toInt());
     user.coordinates = obj.value(CG_CO).toBool();
     user.countryFlag = obj.value(CG_CF).toInt();
     user.elo = obj.value(CG_E).toInt();
@@ -503,62 +556,27 @@ void CG_Database::setUser(CG_User &user, QString name, QString json_settings)
 
 QString CG_Database::serializeUser(const CG_User &user)
 {
-    return QString();
+    QString out;
+    if(user.isValid){
+        QJsonObject obj;
+        obj[CG_AR] =user.arrows;
+        obj[CG_AP] = user.autoPromote;
+        obj[CG_BAN] = user.banned;
+        obj[CG_BT] = user.boardTheme;
+        obj[CG_BF] = int(user.cgbitfield);
+        obj[CG_CO] = user.coordinates;
+        obj[CG_CF] = user.countryFlag;
+        obj[CG_E] = user.elo;
+        obj[CG_LANG] = user.language;
+        QJsonDocument doc;
+        doc.setObject(obj);
+        out = doc.toJson();
+    }
+    return out;
 }
 
 
-void CG_Database::testUserVerify()
-{
-    QFETCH(QString, username);
-    QFETCH(QByteArray, pass);
-    QFETCH(bool, result);
-    qDebug() << "Testing User Verify " << username << " /w " << pass << result;
-    QSqlQuery qry(m_dbUser);
-    qry.prepare("SELECT * FROM cg_user WHERE name LIKE ? AND pass = ? ");
-    qry.addBindValue(username);
-    qry.addBindValue(pass);
-    CG_User user;
-    if(qry.exec()){
-        if(qry.next()){
-            QSqlRecord record = qry.record();
-            QString user_data = record.value(4).toString();
-            setUser(user,username,user_data);
-        }
-    }
-    // should be comparing an empty string
 
-    int value;
-
-    bool actual_result = user.isValid;
-
-    QVERIFY( actual_result == result);
-    if((value != 0) && result){
-        qDebug() << "Verify success: User Credentials";
-        qDebug() << user;
-    }
-    else{
-        qDebug() << "Verify Failed User doesn't Exist :"<< username << " " << pass;
-    }
-
-}
-
-void CG_Database::testUserVerify_data()
-{
-    QTest::addColumn<QString>("username");
-    QTest::addColumn<QByteArray>("pass");
-    QTest::addColumn<bool>("result");
-    QByteArray encoded_str;
-    encoded_str = QString("afasf323fa").toLatin1();
-    QTest::newRow("Stu") << "Stu" << encoded_str << false;
-    encoded_str = QString("sw1").toLatin1();
-    QTest::newRow("StarWars") <<  "StarWars" << encoded_str << true;
-    encoded_str = QString("fads" ).toLatin1();
-    QTest::newRow("Chris") << "Chris" << encoded_str << false;
-    encoded_str = QString("pass").toLatin1();
-    QTest::newRow("Tpimp")     <<  "Tpimp" << encoded_str << true;
-    encoded_str = QString("test").toLatin1();
-    QTest::newRow("test user") <<  "Test" << encoded_str << true;
-}
 CG_Database::~CG_Database()
 {
     if(m_dbUser.isOpen()){

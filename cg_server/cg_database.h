@@ -55,7 +55,6 @@ public:
     explicit CG_Database(QString user_db_path,QObject *parent = nullptr);
     ~CG_Database();
     bool databaseExists(QString path);
-    void userExists(QString str_username, bool &found);
     bool setUserCredentials(QString str_username, QByteArray new_pass, QByteArray old_pass);
     bool updateCountryFlag(QString str_username, int country_flag);
     bool updateUserInfo(CG_User user);
@@ -65,17 +64,21 @@ public:
     bool updateCurrentELO(QString str_username, int elo);
     QString getCurrentELO(QString str_username);
     void getUserInfo(CG_User &user, QString str_username);
-    static void setUser(CG_User & user, QString name, QString json_settings);
+    static void setUserStruct(CG_User & user, QString name, QString json_settings);
     static QString serializeUser(const CG_User &user);
 
     void setToAThread(QThread* thread);
+
 signals:
     void databaseLoadComplete();
-
     void userVerificationComplete(QWebSocket* socket, bool verified, CG_User data);
-
+    void foundUser(QString name, bool found);
+    void userDataSet(QString name, bool set);
+    void gotElo(QString name, int elo);
 public slots:
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
+    bool userExists(QString str_username);
+    bool setUserData(QString name, QByteArray pass, QString data);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
@@ -84,6 +87,21 @@ protected:
     void createMatchTables();
     void clearUserDatabase();
     void createUserTables();
+
+    // actualy methods
+    bool puserExists(QString str_username);
+    bool paddUser(QString str_username, QByteArray pass, QString str_email);
+    //bool psetUserCredentials(QString str_username, QByteArray new_pass, QByteArray old_pass);
+    //bool pupdateCountryFlag(QString str_username, int country_flag);
+    //bool pupdateUserInfo(CG_User user);
+    //int pgetCountryFlag(QString str_username);
+    //void pencryptPassword(QString & password);
+    bool psetUserData(QString name, QString data);
+    bool pverifyUserCredentials(QString name, QByteArray pass, CG_User &user);
+    //bool pupdateCurrentELO(QString str_username, int elo);
+    QString pgetCurrentELO(QString str_username);
+    //void pgetUserInfo(CG_User &user, QString str_username);
+
 #ifdef CG_TEST_ENABLED
 private slots:
     void createUserDatabase();
@@ -94,7 +112,7 @@ private slots:
 #else
 public:
     void createUserDatabase();
-    void addUser(QString str_username, QByteArray pass, QString str_email, bool &error);
+    bool addUser(QString str_username, QByteArray pass, QString str_email);
 
 #endif
 

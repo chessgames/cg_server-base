@@ -54,19 +54,21 @@ CG_Database::CG_Database(QString user_db_path, QObject *parent)
 *
 *     Exit:  Returns whether or not the user exists.
 ****************************************************************/
-void CG_Database::userExists(QString str_username, bool &found)
+
+bool CG_Database::userExists(QString str_username)
 {
+    return puserExists(str_username);
+}
+
+bool CG_Database::puserExists(QString str_username)
+{
+    bool found(false);
     QSqlQuery qry( m_dbUser );
     qry.prepare( "SELECT * FROM cg_user WHERE name= ?;" );
     qry.addBindValue(str_username);
     qry.exec();
     QSqlError err = qry.lastError();
     if(err.isValid()){
-#ifdef CG_TEST_ENABLED
-        QVERIFY(false);
-#else
-        Q_ASSERT(err.isValid());
-#endif
         found = false;
     }
     for(;qry.next();){
@@ -79,7 +81,11 @@ void CG_Database::userExists(QString str_username, bool &found)
             found = true;
         }
     }
+    emit foundUser(str_username,found);
+    return found;
 }
+
+
 
 bool CG_Database::databaseExists(QString path)
 {
@@ -97,12 +103,16 @@ bool CG_Database::databaseExists(QString path)
 *     Exit:  Returns whether or not the user was successfully
 *            added into the database.
 ****************************************************************/
-#ifndef CG_TEST_ENABLED
-void CG_Database::addUser(QString str_username, QByteArray pass, QString str_email, bool &error)
+
+bool CG_Database::addUser(QString str_username, QByteArray pass, QString str_email)
 {
-    userExists(str_username,error);
-    if(error){
-        return; // cannot add user that already exists
+    return paddUser(str_username,pass,str_email);
+}
+
+bool CG_Database::paddUser(QString str_username, QByteArray pass, QString str_email)
+{
+    if(!puserExists(str_username)){
+        return false; // cannot add user that already exists
     }
 
     int user_id(-1); // should be set to an invalid id
@@ -122,16 +132,17 @@ void CG_Database::addUser(QString str_username, QByteArray pass, QString str_ema
     qry.addBindValue(str_username);
     QSqlError err = qry.lastError();
     if(err.isValid()){
-        error = false;
-        return;
+        return false;
     }
     else
     {
         user_id = qry.value(0).toInt();
         qDebug() << "Bad User Id found in DB @ "<< user_id <<" for " << str_username;
     }
+    return true;
 }
 
+#ifndef CG_TEST_ENABLED
 
 
 #else
@@ -202,24 +213,8 @@ void CG_Database::testUserVerify()
     QFETCH(QByteArray, pass);
     QFETCH(bool, result);
     qDebug() << "Testing User Verify " << username << " /w " << pass << result;
-    QSqlQuery qry(m_dbUser);
-    qry.prepare("SELECT * FROM cg_user WHERE name LIKE ? AND pass = ? ");
-    qry.addBindValue(username);
-    qry.addBindValue(pass);
-    CG_User user;
-    if(qry.exec()){
-        if(qry.next()){
-            QSqlRecord record = qry.record();
-            QString user_data = record.value(4).toString();
-            setUser(user,username,user_data);
-        }
-    }
+    bool actual_result = pverifyUserCredentials(username,pass);
     // should be comparing an empty string
-
-    int value;
-
-    bool actual_result = user.isValid;
-
     QVERIFY( actual_result == result);
     if((value != 0) && result){
         qDebug() << "Verify success: User Credentials";
@@ -333,7 +328,7 @@ void CG_Database::createMatchTables()
 *     Exit:  Returns the current ELO of a user.
 ****************************************************************/
 
-QString CG_Database::getCurrentELO(QString str_username)
+QString CG_Database::pgetCurrentELO(QString str_username)
 {
     QString result;
     QSqlQuery qry(m_dbUser );
@@ -347,6 +342,14 @@ QString CG_Database::getCurrentELO(QString str_username)
     }
     return result;
 }
+
+QString CG_Database::getCurrentELO(QString str_username)
+{
+    QString elo = pgetCurrentELO(str_username);
+    emit gotElo(str_username,elo.toInt());
+    return elo;
+}
+
 
 
 bool CG_Database::updateCountryFlag(QString str_username, int country_flag)
@@ -366,23 +369,28 @@ bool CG_Database::updateCountryFlag(QString str_username, int country_flag)
 
 void CG_Database::verifyUserCredentials(QWebSocket *socket, QString name, QByteArray hpass)
 {
+    CG_User user;
+    bool verified = pverifyUserCredentials(name, hpass, user);
+    emit userVerificationComplete(socket,verified,user);
+
+}
+
+bool CG_Database::pverifyUserCredentials(QString name, QByteArray pass, CG_User & user){
+    bool verified(false);
     QSqlQuery qry(m_dbUser);
     qry.prepare("SELECT * FROM cg_user WHERE name LIKE ? AND pass = ? ");
     qry.addBindValue(name);
-    qry.addBindValue(hpass);
-    CG_User user;
+    qry.addBindValue(pass);
     if(qry.exec()){
         if(qry.next()){
             QSqlRecord record = qry.record();
             QString user_data = record.value(4).toString();
-            setUser(user,name,user_data);
-            emit userVerificationComplete(socket,true,user);
+            setUserStruct(user,name,user_data);
+            verified = true;
         }
     }
-    emit userVerificationComplete(socket,false,user);
-
+    return verified;
 }
-
 
 int CG_Database::getCountryFlag(QString str_username)
 {
@@ -439,9 +447,7 @@ void CG_Database::encryptPassword(QString &password)
 
 void CG_Database::getUserInfo(CG_User& user,QString str_username)
 {
-    bool error(false);
-    userExists(str_username,error);
-    if(error){
+    if(userExists(str_username)){
         return;
     }
     QSqlQuery qry( m_dbUser);
@@ -476,9 +482,7 @@ void CG_Database::getUserInfo(CG_User& user,QString str_username)
 
 bool CG_Database::updateUserInfo(CG_User user)
 {
-    bool error(false);
-    userExists(user.username,error);
-    if(error){
+    if(userExists(user.username)){
         return false;
     }
 
@@ -535,7 +539,7 @@ void CG_Database::setToAThread(QThread *thread)
     moveToThread(thread);
 }
 
-void CG_Database::setUser(CG_User &user, QString name, QString json_settings)
+void CG_Database::setUserStruct(CG_User &user, QString name, QString json_settings)
 {
     user.username = name;
     QJsonDocument doc = QJsonDocument::fromJson(json_settings.toLocal8Bit());
@@ -553,6 +557,32 @@ void CG_Database::setUser(CG_User &user, QString name, QString json_settings)
     user.isValid = true;
 }
 
+bool CG_Database::setUserData(QString name, QByteArray pass, QString data)
+{
+    CG_User user;
+    bool data_set = pverifyUserCredentials(name,pass,user);
+    if(data_set){
+        data_set = psetUserData(name,data);
+    }
+    emit userDataSet(name,data_set);
+    return data_set;
+}
+
+
+bool CG_Database::psetUserData(QString name, QString data)
+{
+    bool set_data(false);
+    QSqlQuery qry(m_dbUser);
+    qry.prepare("UPDATE cg_user set data = ? WHERE name LIKE ?;");
+    qry.addBindValue(data);
+    qry.addBindValue(name);
+    if(qry.exec()){
+        if(qry.next()){
+            set_data = true;
+        }
+    }
+    return set_data;
+}
 
 QString CG_Database::serializeUser(const CG_User &user)
 {

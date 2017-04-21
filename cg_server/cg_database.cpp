@@ -10,6 +10,8 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QVariant>
+#include <QCryptographicHash>
+
 
 #ifdef CG_TEST_ENABLED
 #include <QtTest/QTest>
@@ -119,7 +121,6 @@ bool CG_Database::paddUser(QString str_username, QByteArray pass, QString str_em
 
     QSqlQuery qry( m_dbUser);
     // create settings object
-    updateCurrentELO(str_username,0);
     QString data = "";// setting_object.toJson();
     qry.prepare( "INSERT INTO CG_User (name, pass, email, data) VALUES(?, ?, ?,?);" );
     qry.addBindValue(str_username);
@@ -146,54 +147,50 @@ bool CG_Database::paddUser(QString str_username, QByteArray pass, QString str_em
 
 
 #else
-void CG_Database::addUser_data()
+void CG_Database::testAddUser_data()
 {
     QTest::addColumn<QString>("str_username");
-    QTest::addColumn<QByteArray>("pass");
+    QTest::addColumn<QString>("pass");
     QTest::addColumn<QString>("str_email");
 
-    QByteArray encoded_str;
-    encoded_str = QString("sw1").toLatin1();
-    QTest::newRow("StarWars") <<  "StarWars" << encoded_str << "sw@stu.com";
-    encoded_str = QString("pass").toLatin1();
-    QTest::newRow("Tpimp")     <<  "Tpimp" << encoded_str << "tpimp@tester.com";
-    encoded_str = QString("test").toLatin1();
-    QTest::newRow("test user") <<  "Test" << encoded_str << "test@user.com";
+    QTest::newRow("StarWars") <<  "StarWars" <<"sw1" << "sw@stu.com";
+    QTest::newRow("Tpimp")     <<  "Tpimp" << "pass" << "tpimp@tester.com";
+    QTest::newRow("test user") <<  "Test" << "test" << "test@user.com";
 }
 
-void CG_Database::addUser()
+void CG_Database::testAddUser()
 {
 
     QFETCH(QString, str_username);
-    QFETCH(QByteArray, pass);
+    QFETCH(QString, pass);
     QFETCH(QString, str_email);
-    bool error(false);
-    userExists(str_username,error);
-    if(error){
+    if(userExists(str_username)){
         return; // cannot add user that already exists
     }
-
-    bool added_user(false);
 
     QSqlQuery qry( m_dbUser);
     // create settings object
     //updateCurrentELO(str_username,0);
-    QString data = "";// setting_object.toJson();
+    CG_User user;
+    user.isValid = true;
+    user.username = str_username;
+    QCryptographicHash hasher(QCryptographicHash::Sha256);
+    hasher.addData(pass.toLocal8Bit());
+    QByteArray hpass = hasher.result().toHex();
     qry.prepare( "INSERT INTO cg_user (name, pass, email, data) VALUES(?, ?, ?, ?);" );
     qry.addBindValue(str_username);
-    qry.addBindValue(pass);
+    qry.addBindValue(hpass);
     qry.addBindValue(str_email);
-    qry.addBindValue(data);
+    qry.addBindValue(serializeUser(user));
 
     QVERIFY(qry.exec());
 
-    added_user = true;
+
     qry.prepare("SELECT * FROM cg_user WHERE name LIKE ?");
     qry.addBindValue(str_username);
     QVERIFY(qry.exec());
     QSqlError err = qry.lastError();
     if(err.isValid()){
-        error = false;
         return;
     }
     else
@@ -210,13 +207,17 @@ void CG_Database::addUser()
 void CG_Database::testUserVerify()
 {
     QFETCH(QString, username);
-    QFETCH(QByteArray, pass);
+    QFETCH(QString, pass);
     QFETCH(bool, result);
     qDebug() << "Testing User Verify " << username << " /w " << pass << result;
-    bool actual_result = pverifyUserCredentials(username,pass);
+    CG_User user;
+    QCryptographicHash hasher(QCryptographicHash::Sha256);
+    hasher.addData(pass.toLocal8Bit());
+    QByteArray hpass = hasher.result().toHex();
+    bool actual_result = pverifyUserCredentials(username,hpass,user);
     // should be comparing an empty string
     QVERIFY( actual_result == result);
-    if((value != 0) && result){
+    if(actual_result == result){
         qDebug() << "Verify success: User Credentials";
         qDebug() << user;
     }
@@ -229,19 +230,14 @@ void CG_Database::testUserVerify()
 void CG_Database::testUserVerify_data()
 {
     QTest::addColumn<QString>("username");
-    QTest::addColumn<QByteArray>("pass");
+    QTest::addColumn<QString>("pass");
     QTest::addColumn<bool>("result");
-    QByteArray encoded_str;
-    encoded_str = QString("afasf323fa").toLatin1();
-    QTest::newRow("Stu") << "Stu" << encoded_str << false;
-    encoded_str = QString("sw1").toLatin1();
-    QTest::newRow("StarWars") <<  "StarWars" << encoded_str << true;
-    encoded_str = QString("fads" ).toLatin1();
-    QTest::newRow("Chris") << "Chris" << encoded_str << false;
-    encoded_str = QString("pass").toLatin1();
-    QTest::newRow("Tpimp")     <<  "Tpimp" << encoded_str << true;
-    encoded_str = QString("test").toLatin1();
-    QTest::newRow("test user") <<  "Test" << encoded_str << true;
+
+    QTest::newRow("Stu") << "Stu" << "afasf323fa" << false;
+    QTest::newRow("StarWars") <<  "StarWars" << "sw1" << true;
+    QTest::newRow("Chris") << "Chris" << "fads" << false;
+    QTest::newRow("Tpimp")     <<  "Tpimp" << "pass" << true;
+    QTest::newRow("test user") <<  "Test" << "test" << true;
 }
 
 #endif
@@ -253,17 +249,6 @@ void CG_Database::testUserVerify_data()
 *     Exit:  Returns true if player elo was set
 ****************************************************************/
 
-bool CG_Database::updateCurrentELO(QString str_username, int elo)
-{
-    bool updateElo = false;
-    CG_User user;
-    //int user_id = getUserInfo(user,str_username);
-    if(user.isValid){
-        user.elo = elo;
-        //updateUserData(user, user_id);
-    }
-    return updateElo;
-}
 
 
 void CG_Database::createUserDatabase()
@@ -320,59 +305,12 @@ void CG_Database::createMatchTables()
 
 
 
-/**************************************************************
-*	  Purpose:  To retrieve the current ELO rating of a user.
-*
-*     Entry:  User is logged in.
-*
-*     Exit:  Returns the current ELO of a user.
-****************************************************************/
-
-QString CG_Database::pgetCurrentELO(QString str_username)
-{
-    QString result;
-    QSqlQuery qry(m_dbUser );
-    qry.prepare( "SELECT CurrentELO FROM CG_user WHERE name= ?;" );
-    qry.addBindValue(str_username);
-
-    if(qry.exec()){
-        for (int count = 0; qry.next(); count++){
-            result = qry.value(0).toString();
-        }
-    }
-    return result;
-}
-
-QString CG_Database::getCurrentELO(QString str_username)
-{
-    QString elo = pgetCurrentELO(str_username);
-    emit gotElo(str_username,elo.toInt());
-    return elo;
-}
-
-
-
-bool CG_Database::updateCountryFlag(QString str_username, int country_flag)
-{
-    bool updateCountry = false;
-    QSqlQuery qry( m_dbUser );
-
-    qry.prepare( "UPDATE CG_user SET userCountry = ? WHERE name = ?;" );
-    qry.addBindValue(country_flag);
-    qry.addBindValue(str_username);
-
-    if(qry.exec()){
-        updateCountry = true;
-    }
-    return updateCountry;
-}
 
 void CG_Database::verifyUserCredentials(QWebSocket *socket, QString name, QByteArray hpass)
 {
     CG_User user;
     bool verified = pverifyUserCredentials(name, hpass, user);
     emit userVerificationComplete(socket,verified,user);
-
 }
 
 bool CG_Database::pverifyUserCredentials(QString name, QByteArray pass, CG_User & user){
@@ -392,147 +330,8 @@ bool CG_Database::pverifyUserCredentials(QString name, QByteArray pass, CG_User 
     return verified;
 }
 
-int CG_Database::getCountryFlag(QString str_username)
-{
-    int result;
-    QSqlQuery qry( m_dbUser );
-    qry.prepare( "SELECT userCountry FROM CG_user WHERE Username= ?;" );
-    qry.addBindValue(str_username);
-
-    if(qry.exec()){
-        for (int count = 0; qry.next(); count++){
-            result = qry.value(0).toInt();
-        }
-    }
-    return result;
-}
 
 
-/**************************************************************
-*	  Purpose:  To encrypt a password using the SHA256 hashing
-*               function.
-*
-*     Entry:  User is attempting to login or register.
-*
-*     Exit:  Alters the password string based upon the SHA256
-*            encryption.
-****************************************************************/
-//TODO: This should have been done on client side
-void CG_Database::encryptPassword(QString &password)
-{
-    // do nothing, but dont break anything
-
-}
-
-//void CG_Database::encryptPassword(QString & password)
-//{
-//    // Takes the text in the le_password and converts it to Utf8, so it can be placed in a type of 'const char *' next
-//    QByteArray passwordInBytes = password.toUtf8();
-
-//    // casting the data in passwordInBytes (currently in the form of 'Utf8' to a type of 'const char *'
-//    const char * convertedPasswordToVerify = passwordInBytes.constData();
-
-//            /* Instantiating an object that will create the hashing key for the password. Takes an argument specifying
-//             * the encryption type you would like be executed on the string */
-//    QCryptographicHash sha256PasswordEncryptionGenerator( QCryptographicHash::Sha256 );
-
-//    // Adding the data to password encryption generator
-//    sha256PasswordEncryptionGenerator.addData( convertedPasswordToVerify );
-
-//    // Converting the password to the hash key using the result method and placing it in password.
-//    password = (QString)sha256PasswordEncryptionGenerator.result();
-//}
-
-
-
-void CG_Database::getUserInfo(CG_User& user,QString str_username)
-{
-    if(userExists(str_username)){
-        return;
-    }
-    QSqlQuery qry( m_dbUser);
-    qry.prepare( "SELECT data WHERE name LIKE ?;" );
-    qry.addBindValue(str_username);
-
-
-    if(qry.exec())
-    {
-        QVariant var = qry.value("data");
-        user.loggedIn = qry.value(0).toBool();
-        qDebug() << "UserInfo Logged in bit: " << user.loggedIn;
-
-        user.banned = qry.value(1).toBool();
-        qDebug() << "UserInfo Banned bit: " << user.banned;
-
-        user.username = qry.value(2).toString();
-        user.elo = qry.value(3).toInt();
-        qDebug() << "Username from database: " << user.username << " ELO: " << user.elo;
-
-        user.countryFlag = qry.value(4).toInt();
-        user.pieceSet = qry.value(5).toInt();
-        user.language = qry.value(6).toInt();
-        user.sound = qry.value(7).toBool();
-        user.coordinates = qry.value(8).toBool();
-        user.arrows = qry.value(9).toBool();
-        user.autoPromote = qry.value(10).toBool();
-        user.boardTheme = qry.value(11).toString();
-
-    }
-}
-
-bool CG_Database::updateUserInfo(CG_User user)
-{
-    if(userExists(user.username)){
-        return false;
-    }
-
-
-    bool update = false;
-    QSqlQuery qry(m_dbUser);
-
-    qry.prepare( "UPDATE CG_user SET LoggedIn = ?, Banned = ?, CurrentELO = ?, userCountry = ?, userLanguage = ?, BoardTheme = ? WHERE Username = ?;" );
-    qry.addBindValue(user.loggedIn);
-    qry.addBindValue(user.banned);
-    qry.addBindValue(user.elo);
-    qry.addBindValue(user.countryFlag);
-    qry.addBindValue(user.language);
-    qry.addBindValue(user.boardTheme);
-    qry.addBindValue(user.username);
-
-    if(!qry.exec()){
-        qDebug() << "Failed to update the user info: " << user.username;
-        return false;
-    }
-
-    qry.prepare( "SELECT UserID \
-                 FROM CG_user \
-                 WHERE Username = ?;");
-    qry.addBindValue(user.username);
-
-    int userID = 0;
-    if (qry.exec()){
-        for (int count = 0; qry.next(); count++){
-            userID = qry.value(0).toInt();
-        }
-
-        update = true;
-    }
-    qry.prepare( "UPDATE CG_settings \
-                 SET sound = ?, auto_promotion = ?, \
-                 arrows = ?, boardCoordinates = ?, \
-                 pieceSet = ? \
-                WHERE UserID = ?;");
-
-    qry.addBindValue(user.sound);
-    qry.addBindValue(user.autoPromote);
-    qry.addBindValue(user.arrows);
-    qry.addBindValue(user.coordinates);
-    qry.addBindValue(user.pieceSet);
-    qry.addBindValue(userID);
-    update = qry.exec();
-
-    return update;
-}
 
 void CG_Database::setToAThread(QThread *thread)
 {

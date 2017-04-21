@@ -54,19 +54,10 @@ public:
 
     explicit CG_Database(QString user_db_path,QObject *parent = nullptr);
     ~CG_Database();
-    bool databaseExists(QString path);
-    bool setUserCredentials(QString str_username, QByteArray new_pass, QByteArray old_pass);
-    bool updateCountryFlag(QString str_username, int country_flag);
-    bool updateUserInfo(CG_User user);
-    int getCountryFlag(QString str_username);
-    void encryptPassword(QString & password);
 
-    bool updateCurrentELO(QString str_username, int elo);
-    QString getCurrentELO(QString str_username);
-    void getUserInfo(CG_User &user, QString str_username);
     static void setUserStruct(CG_User & user, QString name, QString json_settings);
     static QString serializeUser(const CG_User &user);
-
+    bool databaseExists(QString path);
     void setToAThread(QThread* thread);
 
 signals:
@@ -79,6 +70,7 @@ public slots:
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
     bool userExists(QString str_username);
     bool setUserData(QString name, QByteArray pass, QString data);
+    bool addUser(QString str_username, QByteArray pass, QString str_email);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
@@ -105,14 +97,13 @@ protected:
 #ifdef CG_TEST_ENABLED
 private slots:
     void createUserDatabase();
-    void addUser();
-    void addUser_data();
+    void testAddUser();
+    void testAddUser_data();
     void testUserVerify();
     void testUserVerify_data();
 #else
 public:
     void createUserDatabase();
-    bool addUser(QString str_username, QByteArray pass, QString str_email);
 
 #endif
 

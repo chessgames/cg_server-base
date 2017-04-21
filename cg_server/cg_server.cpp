@@ -10,12 +10,14 @@
 #include <QtTest/QTest>
 #endif
 
-CG_Server::CG_Server(QString db_path,QObject *parent) : QObject(parent), m_db(db_path,nullptr), m_server(nullptr), m_dbThread(nullptr), m_LobbyThread(nullptr)
+CG_Server::CG_Server(QString db_path,QObject *parent) :
+    QObject(parent), m_db(db_path,nullptr), m_server(nullptr),
+    m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
 {
-    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
-    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
-    m_lobbies.insert(QStringLiteral("5 Minute"),CG_PlayerList());
-    m_lobbies.insert(QStringLiteral("30 Minute"),CG_PlayerList());
+//    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
+//    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
+//    m_lobbies.insert(QStringLiteral("5 Minute"),CG_PlayerList());
+//    m_lobbies.insert(QStringLiteral("30 Minute"),CG_PlayerList());
 
     m_dbThread = new QThread(this);
     m_db.setToAThread(m_dbThread);
@@ -23,33 +25,50 @@ CG_Server::CG_Server(QString db_path,QObject *parent) : QObject(parent), m_db(db
 
     connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials);
     connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
-
+    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendVerifiedPlayerMessage);
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
 #endif
 }
 
-void CG_Server::startToListen(QHostAddress addr, quint16 port, bool error)
+void CG_Server::sendVerifiedPlayerMessage(QWebSocket * socket,  QByteArray message)
 {
+
+}
+
+bool CG_Server::startToListen(QHostAddress addr, quint16 port)
+{
+    bool listening;
     if(m_server == nullptr){
         m_server = new QWebSocketServer("CG_Server",QWebSocketServer::NonSecureMode,this); // http connection
     }
-    #ifdef CG_TEST_ENABLED
-            QVERIFY(m_server);
-    #else
-            Q_ASSERT(m_server);
-    #endif
     connect(m_server, &QWebSocketServer::newConnection, this, &CG_Server::incommingConnection);
-    error = !m_server->listen(addr,port);
-    if(error){
+    listening = m_server->listen(addr,port);
+    if(!listening){
         qDebug() << "Failed to start the server for: " << addr << " @ " << port;
         Q_ASSERT(m_server->isListening());
     }
     else{
         qDebug() << "Started the server on: " << addr << " @ " << port;
     }
+    return listening;
+}
+#ifdef CG_TEST_ENABLED
+void CG_Server::testStartListen()
+{
+    QFETCH(QString, ip);
+    QFETCH(int, port);
+    bool listening  = startToListen(QHostAddress(ip),port);
+    QCOMPARE(listening,true);
 }
 
+void CG_Server::testStartListen_data()
+{
+    QTest::addColumn<QString>("ip");
+    QTest::addColumn<int>("port");
+    QTest::newRow("Local") <<  "127.0.0.1" << 5442;
+}
+#endif
 void CG_Server::closeServer()
 {
     if(m_server){
@@ -67,12 +86,12 @@ int CG_Server::getMatchCount()
 
 int CG_Server::getPlayerCount()
 {
-    return m_lobbies.value("All").count();
+    return m_connected.count();
 }
 
 int CG_Server::getQueueCount()
 {
-    return m_lobbies.value("1M").count();
+    //return m_lobbies.value("1M").count();
 }
 
 
@@ -134,18 +153,44 @@ void CG_Server::incommingPendingMessage(QByteArray message)
         return;
     }
 
-    QString name = obj.value("N").toString();
-    QString pass_str = obj.value("P").toString();
-    QByteArray hpass = pass_str.toLatin1();
-    if(name.isEmpty() || pass_str.isEmpty() || hpass.isEmpty()){
-        return;
+    int target = obj["T"].toInt();
+    QJsonArray params = obj["P"].toArray();
+    switch(target)
+    {
+        case VERIFY_USER:{
+            if(params.count() > 2){
+                QString name = params.at(0).toString();
+                QString pass_str = params.at(1).toString();
+                QByteArray hpass = pass_str.toLatin1();
+                emit verifyPlayer(socket,name,hpass);
+            }
+            else{
+                qDebug() << "Received verify user command for " << socket->peerAddress();
+            }
+        }
+        default: break;
+
     }
-    emit verifyPlayer(socket,name,hpass);
 }
 
 void CG_Server::incommingVerifiedMessage(QByteArray message)
 {
+    QWebSocket * socket = qobject_cast<QWebSocket*>(sender());
     // route a verified player message
+    QJsonDocument doc = QJsonDocument::fromBinaryData(message);
+    QJsonObject obj = doc.object();
+    int target = obj["T"].toInt();
+    QJsonArray params = obj["P"].toArray();
+    switch(target)
+    {
+        case FETCH_LOBBIES:{
+            // no parameters only a return
+            emit fetchLobbies(socket);
+            break;
+        }
+        default: break;
+    }
+
 
 }
 

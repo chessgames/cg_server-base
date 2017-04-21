@@ -1,12 +1,12 @@
 #include <QCoreApplication>
 #include "cg_server.h"
-#include"signal.h"
-#include"unistd.h"
 
 #ifdef CG_TEST_ENABLED
 #include <QtTest/QTest>
 #endif
-
+#ifdef Q_OS_LINUX
+#include"signal.h"
+#include"unistd.h"
 static void kill_server(int sig)
 {
         printf("\nquit the application (user request signal = %d).\n", sig);
@@ -27,25 +27,34 @@ void handleUnixSignals(const std::vector<int>& quitSignals,
     for ( int sig : quitSignals )
         signal(sig, kill_server);
 }
-
+#endif
 #ifdef CG_TEST_ENABLED
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
     a.setAttribute(Qt::AA_Use96Dpi, true);
+#ifdef Q_OS_LINUX
     handleUnixSignals({SIGABRT,SIGINT,SIGQUIT,SIGTERM });
     CG_Server server("/srv/CG/user.sqlite",&a);
+#else
+    CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
+#endif
     QTEST_SET_MAIN_SOURCE_PATH
     QTest::qExec(&server, argc, argv);
+    //return a.exec();
 }
 #else
 int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
+#ifdef Q_OS_LINUX
     handleUnixSignals({SIGABRT,SIGINT,SIGQUIT,SIGTERM });
     CG_Server server("/srv/CG/user.sqlite",&a);
+#else
+    CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
+#endif
     bool error(false);
-    server.startToListen(QHostAddress("192.168.3.105"),5452,error);
+    server.startToListen(QHostAddress("127.0.0.01"),5452,error);
     return a.exec();
 }
 #endif

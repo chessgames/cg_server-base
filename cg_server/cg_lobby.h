@@ -2,10 +2,10 @@
 #define CG_LOBBY_H
 
 
-class cg_lobby
+class CG_Lobby
 {
 public:
-    cg_lobby();
+    CG_Lobby();
 
 };
 

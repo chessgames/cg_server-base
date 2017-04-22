@@ -103,22 +103,20 @@ void CG_Server::closePending()
 {
     QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
     m_pending.removeAll(socket);
-    socket->abort();
-    socket->deleteLater();
 }
 
 void CG_Server::pendingDisconnected()
 {
     QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
     m_pending.removeAll(socket);
-    socket->deleteLater();
 }
 
 void CG_Server::incommingConnection()
 {
     // get the websocket
-    QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
+    QWebSocket* socket = m_server->nextPendingConnection();
     QString ip = socket->peerAddress().toString();
+    qDebug() << "Incomming connection from " << ip;
     if(m_banned.contains(ip)){
         socket->close(QWebSocketProtocol::CloseCodePolicyViolated,"GTFO Bro");
     }
@@ -158,7 +156,7 @@ void CG_Server::incommingPendingMessage(QByteArray message)
     switch(target)
     {
         case VERIFY_USER:{
-            if(params.count() > 2){
+            if(params.count() >= 2){
                 QString name = params.at(0).toString();
                 QString pass_str = params.at(1).toString();
                 QByteArray hpass = pass_str.toLatin1();
@@ -218,18 +216,32 @@ void CG_Server::playerDropped()
 
 void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
 {
+    QJsonObject obj;
+    obj["T"] = VERIFY_USER;
+    QJsonArray params;
+    params.append(verified);
+    QJsonDocument doc;
     m_pending.removeAll(socket);
-    if(verified && (!data.username.isEmpty())){
+    if(verified ){
         CG_Player player;
         player.mWebSocket = socket;
         socket->disconnect();
-        connect(socket, &QWebSocket::binaryMessageReceived, this, &CG_Server::incommingPendingMessage);
-        connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::closePending);
-        connect(socket,&QWebSocket::disconnected, this, &CG_Server::pendingDisconnected);
+        connect(socket, &QWebSocket::binaryMessageReceived, this, &CG_Server::incommingVerifiedMessage);
+        connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::playerClosing);
+        connect(socket,&QWebSocket::disconnected, this, &CG_Server::playerDropped);
         player.mUserData = data;
         m_connected.insert(socket,player);
+        params.append(CG_Database::serializeUser(data));
+        data.loggedIn = true;
+        obj["P"]=params;
+        doc.setObject(obj);
+        socket->sendBinaryMessage(doc.toBinaryData());
     }
     else{
+        obj["P"]=params;
+        doc.setObject(obj);
+        socket->sendBinaryMessage(doc.toBinaryData());
+        socket->flush();
         socket->close(QWebSocketProtocol::CloseCodeBadOperation);
         socket->abort();
         socket->deleteLater();

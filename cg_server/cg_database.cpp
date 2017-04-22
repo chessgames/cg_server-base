@@ -216,14 +216,10 @@ void CG_Database::testUserVerify()
     QByteArray hpass = hasher.result().toHex();
     bool actual_result = pverifyUserCredentials(username,hpass,user);
     // should be comparing an empty string
-    QVERIFY( actual_result == result);
-    if(actual_result == result){
-        qDebug() << "Verify success: User Credentials";
-        qDebug() << user;
+    if(!result){
+        QEXPECT_FAIL(username.toLocal8Bit().data() ,"User Didnt exist",Continue);
     }
-    else{
-        qDebug() << "Verify Failed User doesn't Exist :"<< username << " " << pass;
-    }
+    QCOMPARE(actual_result,true);
 
 }
 
@@ -386,21 +382,21 @@ bool CG_Database::psetUserData(QString name, QString data)
 QString CG_Database::serializeUser(const CG_User &user)
 {
     QString out;
-    if(user.isValid){
-        QJsonObject obj;
-        obj[CG_AR] =user.arrows;
-        obj[CG_AP] = user.autoPromote;
-        obj[CG_BAN] = user.banned;
-        obj[CG_BT] = user.boardTheme;
-        obj[CG_BF] = int(user.cgbitfield);
-        obj[CG_CO] = user.coordinates;
-        obj[CG_CF] = user.countryFlag;
-        obj[CG_E] = user.elo;
-        obj[CG_LANG] = user.language;
-        QJsonDocument doc;
-        doc.setObject(obj);
-        out = doc.toJson();
-    }
+    QJsonObject obj;
+    obj[CG_UN] = user.username;
+    obj[CG_AR] =user.arrows;
+    obj[CG_AP] = user.autoPromote;
+    obj[CG_BAN] = user.banned;
+    obj[CG_BT] = user.boardTheme;
+    obj[CG_BF] = int(user.cgbitfield);
+    obj[CG_CO] = user.coordinates;
+    obj[CG_CF] = user.countryFlag;
+    obj[CG_E] = user.elo;
+    obj[CG_LANG] = user.language;
+    QJsonDocument doc;
+    doc.setObject(obj);
+    out = doc.toJson();
+
     return out;
 }
 

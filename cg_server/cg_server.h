@@ -107,11 +107,13 @@ protected slots:
     void playerClosing();
     void playerDropped();
     void userVerified(QWebSocket* socket, bool verified, CG_User data);
+
 #ifdef CG_TEST_ENABLED
 private slots:
     void testStartListen();
     void testStartListen_data();
 #endif
+
 };
 
 #endif // CG_SERVER_H

@@ -65,7 +65,7 @@ signals:
     void userVerificationComplete(QWebSocket* socket, bool verified, CG_User data);
     void foundUser(QString name, bool found);
     void userDataSet(QString name, bool set);
-    void gotElo(QString name, int elo);
+
 public slots:
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
     bool userExists(QString str_username);

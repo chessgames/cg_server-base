@@ -1,5 +1,7 @@
 #include <QCoreApplication>
 #include "cg_server.h"
+#include "cg_global.h"
+Q_DECLARE_METATYPE(CG_User)
 
 #ifdef CG_TEST_ENABLED
 #include <QtTest/QTest>
@@ -31,6 +33,7 @@ void handleUnixSignals(const std::vector<int>& quitSignals,
 #ifdef CG_TEST_ENABLED
 int main(int argc, char *argv[])
 {
+    qRegisterMetaType<CG_User>("CG_User");
     QCoreApplication a(argc, argv);
     a.setAttribute(Qt::AA_Use96Dpi, true);
 #ifdef Q_OS_LINUX
@@ -41,11 +44,12 @@ int main(int argc, char *argv[])
 #endif
     QTEST_SET_MAIN_SOURCE_PATH
     QTest::qExec(&server, argc, argv);
-    //return a.exec();
+    return a.exec();
 }
 #else
 int main(int argc, char *argv[])
 {
+    qRegisterMetaType<CG_User>("CG_User");
     QCoreApplication a(argc, argv);
 #ifdef Q_OS_LINUX
     handleUnixSignals({SIGABRT,SIGINT,SIGQUIT,SIGTERM });
@@ -54,7 +58,7 @@ int main(int argc, char *argv[])
     CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
 #endif
     bool error(false);
-    server.startToListen(QHostAddress("127.0.0.01"),5452,error);
+    server.startToListen(QHostAddress("127.0.0.01"),5452);
     return a.exec();
 }
 #endif

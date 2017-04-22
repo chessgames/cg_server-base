@@ -44,6 +44,8 @@ static QDebug operator<<(QDebug dbg, const CG_User &user)
     return dbg.maybeSpace();
 }
 
+
+
 // server globals
 // Login
 static const int VERIFY_USER =  453;

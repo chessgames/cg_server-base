@@ -64,13 +64,14 @@ signals:
     void databaseLoadComplete();
     void userVerificationComplete(QWebSocket* socket, bool verified, CG_User data);
     void foundUser(QString name, bool found);
+    void addUserReply(QWebSocket* socket, bool added, int reason);
     void userDataSet(QString name, bool set);
 
 public slots:
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
+    bool addUser(QWebSocket* socket,QString str_username, QByteArray pass, QString str_email);
     bool userExists(QString str_username);
     bool setUserData(QString name, QByteArray pass, QString data);
-    bool addUser(QString str_username, QByteArray pass, QString str_email);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
@@ -82,7 +83,8 @@ protected:
 
     // actualy methods
     bool puserExists(QString str_username);
-    bool paddUser(QString str_username, QByteArray pass, QString str_email);
+    int paddUser(QString str_username, QByteArray pass, QString str_email);
+    bool pemailExists(QString str_email);
     //bool psetUserCredentials(QString str_username, QByteArray new_pass, QByteArray old_pass);
     //bool pupdateCountryFlag(QString str_username, int country_flag);
     //bool pupdateUserInfo(CG_User user);

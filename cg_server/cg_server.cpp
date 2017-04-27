@@ -24,6 +24,8 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
     m_dbThread->start();
 
     connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials);
+    connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser);
+    connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
     connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
     connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendVerifiedPlayerMessage);
 #ifdef CG_TEST_ENABLED
@@ -35,6 +37,7 @@ void CG_Server::sendVerifiedPlayerMessage(QWebSocket * socket,  QByteArray messa
 {
 
 }
+
 
 bool CG_Server::startToListen(QHostAddress addr, quint16 port)
 {
@@ -165,6 +168,17 @@ void CG_Server::incommingPendingMessage(QByteArray message)
             else{
                 qDebug() << "Received verify user command for " << socket->peerAddress();
             }
+            break;
+        }
+        case REGISTER_USER:{
+            if(params.count() >= 3){
+                QString name = params.at(0).toString();
+                QString pass_str = params.at(1).toString();
+                QByteArray hpass = pass_str.toLatin1();
+                QString email = params.at(2).toString();
+                emit addUser(socket,name,hpass,email);
+            }
+            break;
         }
         default: break;
 
@@ -186,6 +200,7 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             emit fetchLobbies(socket);
             break;
         }
+
         default: break;
     }
 
@@ -198,9 +213,6 @@ void CG_Server::playerClosing()
     CG_Player player = m_connected.take(socket);
     emit notifyPlayerLeaving(player.mUserData.username,player.mConnectedLobbies);
     emit disconnectPlayer(player);
-    socket->close();
-    socket->abort();
-    socket->deleteLater();
 }
 
 
@@ -214,6 +226,26 @@ void CG_Server::playerDropped()
 }
 
 
+void CG_Server::sendAddUserReply(QWebSocket *socket, bool added, int reason)
+{
+    QJsonObject obj;
+    obj["T"] = REGISTER_USER;
+    QJsonArray params;
+    params.append(added);
+    params.append(reason);
+    QJsonDocument doc;
+    if(added ){
+        obj["P"]=params;
+        doc.setObject(obj);
+        socket->sendBinaryMessage(doc.toBinaryData());
+    }
+    else{
+        obj["P"]=params;
+        doc.setObject(obj);
+        socket->sendBinaryMessage(doc.toBinaryData());
+    }
+}
+
 void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
 {
     QJsonObject obj;
@@ -221,7 +253,6 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
     QJsonArray params;
     params.append(verified);
     QJsonDocument doc;
-    m_pending.removeAll(socket);
     if(verified ){
         CG_Player player;
         player.mWebSocket = socket;
@@ -241,10 +272,6 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
         obj["P"]=params;
         doc.setObject(obj);
         socket->sendBinaryMessage(doc.toBinaryData());
-        socket->flush();
-        socket->close(QWebSocketProtocol::CloseCodeBadOperation);
-        socket->abort();
-        socket->deleteLater();
     }
 }
 

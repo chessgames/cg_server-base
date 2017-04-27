@@ -64,12 +64,15 @@ public:
 signals:
     void playersReadyToBeMatched();
     void verifyPlayer(QWebSocket * socket, QString name, QByteArray hpass);
+    void addUser(QWebSocket * socket, QString name, QByteArray hpass,QString email);
     void fetchLobbies(QWebSocket* socket);
     void notifyPlayerDropped(QString name, QStringList lobbies);
     void notifyPlayerLeaving(QString name, QStringList lobbies);
+    void requestAddUser(QString user, QByteArray password, QString email);
     void disconnectPlayer(CG_Player);
 public slots:
     void sendVerifiedPlayerMessage(QWebSocket * socket,  QByteArray message);
+    void sendAddUserReply(QWebSocket * socket,bool added, int reason);
     /*void clientDisconnected();
     void handleJoinQueue(TimeControl time_type);
     void queueTimerExpired();

@@ -62,6 +62,21 @@ bool CG_Database::userExists(QString str_username)
     return puserExists(str_username);
 }
 
+
+bool CG_Database::pemailExists(QString str_email)
+{
+    bool found(false);
+    QSqlQuery qry( m_dbUser );
+    qry.prepare( "SELECT * FROM cg_user WHERE email= ?;" );
+    qry.addBindValue(str_email);
+    qry.exec();
+    QSqlError err = qry.lastError();
+    for(;qry.next();){
+        return true;
+    }
+    return false;
+}
+
 bool CG_Database::puserExists(QString str_username)
 {
     bool found(false);
@@ -106,41 +121,51 @@ bool CG_Database::databaseExists(QString path)
 *            added into the database.
 ****************************************************************/
 
-bool CG_Database::addUser(QString str_username, QByteArray pass, QString str_email)
+bool CG_Database::addUser(QWebSocket * socket, QString str_username, QByteArray pass, QString str_email)
 {
-    return paddUser(str_username,pass,str_email);
+    int added(paddUser(str_username,pass,str_email));
+    emit addUserReply(socket,bool(added == 0), added);
+    return (added == 0);
 }
 
-bool CG_Database::paddUser(QString str_username, QByteArray pass, QString str_email)
+int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_email)
 {
-    if(!puserExists(str_username)){
-        return false; // cannot add user that already exists
+    if(puserExists(str_username)){
+        return 1; // cannot add user that already exists
+    }
+    if(pemailExists(str_email)){
+        return 2;
     }
 
     int user_id(-1); // should be set to an invalid id
 
     QSqlQuery qry( m_dbUser);
     // create settings object
-    QString data = "";// setting_object.toJson();
+    CG_User user;
+    QString data =  serializeUser(user);
     qry.prepare( "INSERT INTO CG_User (name, pass, email, data) VALUES(?, ?, ?,?);" );
     qry.addBindValue(str_username);
     qry.addBindValue(pass);
     qry.addBindValue(str_email);
     qry.addBindValue(data);
+    if(!qry.exec()){
+        return 3;
+    }
 
-
-    qry.prepare("SELECT id FROM CG_User WHERE name = ?");
+    qry.prepare("SELECT id FROM CG_User WHERE name LIKE ?");
     qry.addBindValue(str_username);
+    qry.exec();
     QSqlError err = qry.lastError();
     if(err.isValid()){
-        return false;
+        return 4;
     }
     else
     {
+        qry.next();
         user_id = qry.value(0).toInt();
-        qDebug() << "Bad User Id found in DB @ "<< user_id <<" for " << str_username;
+        qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
     }
-    return true;
+    return 0;
 }
 
 #ifndef CG_TEST_ENABLED

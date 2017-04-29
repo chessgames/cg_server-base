@@ -18,8 +18,8 @@
 #endif
 
 
-CG_Database::CG_Database(QString user_db_path, QString user_name, QString password, QObject *parent)
-    : QObject(parent), m_UserDBPath(user_db_path)
+CG_Database::CG_Database(QString host_name, QString user_name, QString password, QObject *parent)
+    : QObject(parent), m_UserDBPath(host_name)
 {
 #ifdef USE_SQLITE
     m_dbUser = QSqlDatabase::addDatabase("QSQLITE");
@@ -27,34 +27,38 @@ CG_Database::CG_Database(QString user_db_path, QString user_name, QString passwo
 #else
     m_dbUser = QSqlDatabase::addDatabase("QMYSQL");
     m_dbUser.setHostName("localhost");
-    m_dbUser.setUserName(user_name);
-    m_dbUser.setPassword(password);
+    m_dbUser.setPort(9654);
+    m_dbUser.setUserName("root");
+    m_dbUser.setPassword("Sup@FlyChess2017");
+    //m_dbUser.setDatabaseName("CG_DB");
+    m_dbUser.open();
 #endif
-
-    if(!databaseExists(user_db_path)){
+#ifndef USE_SQLITE
+       createUserDatabase();
+#else
+    if(!databaseExists(host_name)){
         #ifndef CG_TEST_ENABLED
         createUserDatabase();
         #endif
     }
     else{
 
-        #ifdef USE_SQLITE
+
             m_dbUser.setDatabaseName(user_db_path);
-        #else
-            m_dbUser.setDatabaseName("CG_DB");
-        #endif
+            Q_ASSERT(m_dbUser.isValid());
+            m_dbUser.setConnectOptions();
+            Q_ASSERT(m_dbUser.open());
+ }
+
         // test db exists
-#ifdef CG_TEST_ENABLED
+    #ifdef CG_TEST_ENABLED
         QVERIFY(m_dbUser.isValid());
         QVERIFY(m_dbUser.open());
-#else
-        Q_ASSERT(m_dbUser.isValid());
-        m_dbUser.setConnectOptions();
-        // test db connection will open
-        Q_ASSERT(m_dbUser.open());
-        qDebug() << "User Database open.";
+    #endif
 #endif
-    }
+        // test db connection will open
+        qDebug() << "User Database open.";
+
 }
 
 /**************************************************************
@@ -118,17 +122,9 @@ bool CG_Database::databaseExists(QString path)
 #ifdef USE_SQLITE
     QDir file(path);
     return file.exists();
-#else
-    QSqlQuery query;
-    query.prepare("SELECT DATABASE CG_DB;");
-    if(query.exec());
-    {
-        if(query.next()){
-            return true;
-        }
-    }
-    return false;
+#else return false;
 #endif
+
 }
 
 
@@ -310,10 +306,11 @@ void CG_Database::createUserDatabase()
 {
 #ifndef USE_SQLITE
     QSqlQuery create_db(m_dbUser);
-    create_db.prepare("CREATE DATABASE CG_DB;");
+    create_db.prepare("CREATE DATABASE IF NOT EXISTS CG_DB;");
     create_db.exec();
-    Q_ASSERT(create_db.next());
+    m_dbUser.close();
     m_dbUser.setDatabaseName("CG_DB");
+    m_dbUser.open();
 #else
     QFileInfo f(m_UserDBPath);
     QString path_to_file = f.absolutePath();
@@ -350,7 +347,7 @@ void CG_Database::createUserTables()
  #ifdef USE_SQLITE
     create_user_tbl.prepare("CREATE TABLE cg_user (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pass BLOB , email TEXT, data TEXT);");
 #else
-    create_user_tbl.prepare("CREATE TABLE cg_user (id BLOB, name TEXT, pass TINYBLOB , email TEXT, data TEXT, INDEX(id(1024));");
+    create_user_tbl.prepare("CREATE TABLE cg_user (id BLOB, name TEXT, pass TINYBLOB , email TEXT, data TEXT, INDEX(id(1024)));");
 #endif
     create_user_tbl.exec();
     QSqlError err = m_dbUser.lastError();

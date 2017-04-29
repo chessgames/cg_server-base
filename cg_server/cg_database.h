@@ -52,7 +52,7 @@ class CG_Database : public QObject
     Q_OBJECT
 public:
 
-    explicit CG_Database(QString user_db_path, QString user_name, QString password, QObject *parent = nullptr);
+    explicit CG_Database(QString host_name, QString user_name, QString password, QObject *parent = nullptr);
     ~CG_Database();
 
     static void setUserStruct(CG_User & user, QString name, QString json_settings);

@@ -53,12 +53,18 @@ int main(int argc, char *argv[])
     QCoreApplication a(argc, argv);
 #ifdef Q_OS_LINUX
     handleUnixSignals({SIGABRT,SIGINT,SIGQUIT,SIGTERM });
+    #ifdef USE_SQLITE
     CG_Server server("/srv/CG/user.sqlite",&a);
-#else
-    CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
-#endif
+    #else
+    CG_Server server("/var/run/mysqld/mysqld.sock","root","notarealpassword",&a);
+    #endif
+    #else
+        #ifdef USE_SQLITE
+        CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
+        #endif
     bool error(false);
     server.startToListen(QHostAddress("127.0.0.01"),5452);
     return a.exec();
 }
+    #endif
 #endif

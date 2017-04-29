@@ -53,6 +53,7 @@ class CG_Server : public QObject
     Q_OBJECT
 public:
     explicit CG_Server(QString db_path, QObject *parent = nullptr);
+    CG_Server(QString db_path, QString name, QString password, QObject *parent = nullptr);
     bool startToListen(QHostAddress addr, quint16 port);
     int getPlayerCount();
     int getMatchCount();
@@ -65,14 +66,18 @@ signals:
     void playersReadyToBeMatched();
     void verifyPlayer(QWebSocket * socket, QString name, QByteArray hpass);
     void addUser(QWebSocket * socket, QString name, QByteArray hpass,QString email);
+    void requestSetUserData(QWebSocket * socket, QString name, QByteArray hpass, QString data);
     void fetchLobbies(QWebSocket* socket);
     void notifyPlayerDropped(QString name, QStringList lobbies);
     void notifyPlayerLeaving(QString name, QStringList lobbies);
     void requestAddUser(QString user, QByteArray password, QString email);
     void disconnectPlayer(CG_Player);
 public slots:
-    void sendVerifiedPlayerMessage(QWebSocket * socket,  QByteArray message);
+    void userVerified(QWebSocket* socket, bool verified, CG_User data);
     void sendAddUserReply(QWebSocket * socket,bool added, int reason);
+    void userDataSet(QWebSocket * socket,bool set);
+    void sendLobbyData(QWebSocket* socket, QByteArray list);
+    void sendConnectedToMatchMaking(QWebSocket * socket, QString type);
     /*void clientDisconnected();
     void handleJoinQueue(TimeControl time_type);
     void queueTimerExpired();
@@ -100,6 +105,7 @@ protected slots:
     void incommingPendingMessage(QByteArray message);
     void incommingVerifiedMessage(QByteArray message);
 
+
     void closePending();
     void pendingDisconnected();
 
@@ -109,8 +115,6 @@ protected slots:
 
     void playerClosing();
     void playerDropped();
-    void userVerified(QWebSocket* socket, bool verified, CG_User data);
-
 #ifdef CG_TEST_ENABLED
 private slots:
     void testStartListen();

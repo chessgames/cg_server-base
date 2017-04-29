@@ -52,7 +52,7 @@ class CG_Database : public QObject
     Q_OBJECT
 public:
 
-    explicit CG_Database(QString user_db_path,QObject *parent = nullptr);
+    explicit CG_Database(QString user_db_path, QString user_name, QString password, QObject *parent = nullptr);
     ~CG_Database();
 
     static void setUserStruct(CG_User & user, QString name, QString json_settings);
@@ -65,13 +65,13 @@ signals:
     void userVerificationComplete(QWebSocket* socket, bool verified, CG_User data);
     void foundUser(QString name, bool found);
     void addUserReply(QWebSocket* socket, bool added, int reason);
-    void userDataSet(QString name, bool set);
+    void userDataSet(QWebSocket * socket, bool set);
 
 public slots:
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
     bool addUser(QWebSocket* socket,QString str_username, QByteArray pass, QString str_email);
     bool userExists(QString str_username);
-    bool setUserData(QString name, QByteArray pass, QString data);
+    bool setUserData(QWebSocket * socket, QString name, QByteArray pass, QString data);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles

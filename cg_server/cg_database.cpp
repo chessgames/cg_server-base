@@ -18,34 +18,43 @@
 #endif
 
 
-CG_Database::CG_Database(QString user_db_path, QObject *parent)
+CG_Database::CG_Database(QString user_db_path, QString user_name, QString password, QObject *parent)
     : QObject(parent), m_UserDBPath(user_db_path)
 {
+#ifdef USE_SQLITE
     m_dbUser = QSqlDatabase::addDatabase("QSQLITE");
     m_dbUser.setHostName("CG");
+#else
+    m_dbUser = QSqlDatabase::addDatabase("QMYSQL");
+    m_dbUser.setHostName("localhost");
+    m_dbUser.setUserName(user_name);
+    m_dbUser.setPassword(password);
+#endif
+
     if(!databaseExists(user_db_path)){
         #ifndef CG_TEST_ENABLED
         createUserDatabase();
         #endif
     }
     else{
-        m_dbUser.setDatabaseName(user_db_path);
+
+        #ifdef USE_SQLITE
+            m_dbUser.setDatabaseName(user_db_path);
+        #else
+            m_dbUser.setDatabaseName("CG_DB");
+        #endif
         // test db exists
 #ifdef CG_TEST_ENABLED
         QVERIFY(m_dbUser.isValid());
+        QVERIFY(m_dbUser.open());
 #else
         Q_ASSERT(m_dbUser.isValid());
         m_dbUser.setConnectOptions();
         // test db connection will open
-    #ifdef CG_TEST_ENABLED
-        QVERIFY(m_dbUser.open());
-    #else
         Q_ASSERT(m_dbUser.open());
-    #endif
+        qDebug() << "User Database open.";
 #endif
     }
-
-    qDebug() << "User Database open.";
 }
 
 /**************************************************************
@@ -106,8 +115,20 @@ bool CG_Database::puserExists(QString str_username)
 
 bool CG_Database::databaseExists(QString path)
 {
+#ifdef USE_SQLITE
     QDir file(path);
     return file.exists();
+#else
+    QSqlQuery query;
+    query.prepare("SELECT DATABASE CG_DB;");
+    if(query.exec());
+    {
+        if(query.next()){
+            return true;
+        }
+    }
+    return false;
+#endif
 }
 
 
@@ -143,16 +164,29 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
     // create settings object
     CG_User user;
     QString data =  serializeUser(user);
-    qry.prepare( "INSERT INTO CG_User (name, pass, email, data) VALUES(?, ?, ?,?);" );
+#ifdef USE_SQLITE
+    qry.prepare( "INSERT INTO cg_user (name, pass, email, data) VALUES(?, ?, ?,?);" );
     qry.addBindValue(str_username);
     qry.addBindValue(pass);
     qry.addBindValue(str_email);
     qry.addBindValue(data);
+#else
+    QByteArray id_array;
+    id_array.append(str_username);
+    id_array.append(pass);
+    QByteArray uuid = QCryptographicHash::hash(id_array,QCryptographicHash::Sha3_256);
+    qry.prepare( "INSERT INTO cg_user (id, name, pass, email, data) VALUES(?, ?, ?, ?, ?);" );
+    qry.addBindValue(uuid);
+    qry.addBindValue(str_username);
+    qry.addBindValue(pass);
+    qry.addBindValue(str_email);
+    qry.addBindValue(data);
+#endif
     if(!qry.exec()){
         return 3;
     }
 
-    qry.prepare("SELECT id FROM CG_User WHERE name LIKE ?");
+    qry.prepare("SELECT id FROM cg_user WHERE name LIKE ?");
     qry.addBindValue(str_username);
     qry.exec();
     QSqlError err = qry.lastError();
@@ -274,6 +308,13 @@ void CG_Database::testUserVerify_data()
 
 void CG_Database::createUserDatabase()
 {
+#ifndef USE_SQLITE
+    QSqlQuery create_db(m_dbUser);
+    create_db.prepare("CREATE DATABASE CG_DB;");
+    create_db.exec();
+    Q_ASSERT(create_db.next());
+    m_dbUser.setDatabaseName("CG_DB");
+#else
     QFileInfo f(m_UserDBPath);
     QString path_to_file = f.absolutePath();
     QFileInfo fdir(path_to_file);
@@ -287,19 +328,30 @@ void CG_Database::createUserDatabase()
         m_dbUser.setConnectOptions();
         // test db connection will open
         #ifdef CG_TEST_ENABLED
-            QVERIFY(m_dbUser.open());
+            QVERIFY(m_dbUser.open());   
+            #ifndef USE_SQLITE
+                QSqlQuery create_user_tbl(m_dbUser);
+                create_user_tbl.prepare("CREATE DATABASE CG_DB;");
+                create_user_tbl.exec();
+                QVERIFY(create_user_tbl.next());
+
+            #endif
         #else
             Q_ASSERT(m_dbUser.open());
         #endif
-            createUserTables();
     }
+#endif
+    createUserTables();
 }
 
 void CG_Database::createUserTables()
 {
-
     QSqlQuery create_user_tbl(m_dbUser);
+ #ifdef USE_SQLITE
     create_user_tbl.prepare("CREATE TABLE cg_user (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pass BLOB , email TEXT, data TEXT);");
+#else
+    create_user_tbl.prepare("CREATE TABLE cg_user (id BLOB, name TEXT, pass TINYBLOB , email TEXT, data TEXT, INDEX(id(1024));");
+#endif
     create_user_tbl.exec();
     QSqlError err = m_dbUser.lastError();
 #ifdef CG_TEST_ENABLED
@@ -371,21 +423,21 @@ void CG_Database::setUserStruct(CG_User &user, QString name, QString json_settin
     user.boardTheme = obj.value(CG_BT).toString();
     user.cgbitfield = quint32(obj.value(CG_BF).toInt());
     user.coordinates = obj.value(CG_CO).toBool();
-    user.countryFlag = obj.value(CG_CF).toInt();
+    user.countryFlag = obj.value(CG_CF).toString();
     user.elo = obj.value(CG_E).toInt();
     user.language = obj.value(CG_LANG).toInt();
     user.isValid = true;
 }
 
-bool CG_Database::setUserData(QString name, QByteArray pass, QString data)
+bool CG_Database::setUserData(QWebSocket *socket, QString name, QByteArray pass, QString data)
 {
     CG_User user;
-    bool data_set = pverifyUserCredentials(name,pass,user);
-    if(data_set){
-        data_set = psetUserData(name,data);
+    bool verified = pverifyUserCredentials(name,pass,user);
+    if(verified){
+        verified = psetUserData(name,data);
     }
-    emit userDataSet(name,data_set);
-    return data_set;
+    emit userDataSet(socket,verified);
+    return verified;
 }
 
 

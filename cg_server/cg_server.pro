@@ -21,7 +21,7 @@ SOURCES += main.cpp \
 # depend on your compiler). Please consult the documentation of the
 # deprecated API in order to know how to port your code away from it.
 DEFINES += QT_DEPRECATED_WARNINGS
-
+DEFINES += USE_SQLITE
 #uncomment two lines below to ENABLE testing with QtTest
 #DEFINES += CG_TEST_ENABLED
 #QT += testlib

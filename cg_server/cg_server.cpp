@@ -11,7 +11,7 @@
 #endif
 
 CG_Server::CG_Server(QString db_path,QObject *parent) :
-    QObject(parent), m_db(db_path,nullptr), m_server(nullptr),
+    QObject(parent), m_db(db_path,"","",nullptr), m_server(nullptr),
     m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
 {
 //    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
@@ -27,16 +27,38 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
     connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser);
     connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
     connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
-    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendVerifiedPlayerMessage);
+    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendLobbyData);
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
 #endif
 }
 
-void CG_Server::sendVerifiedPlayerMessage(QWebSocket * socket,  QByteArray message)
-{
 
+CG_Server::CG_Server(QString db_path, QString name, QString password, QObject *parent)
+    :QObject(parent), m_db(db_path,name,password,nullptr), m_server(nullptr),
+    m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
+{
+//    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
+//    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
+//    m_lobbies.insert(QStringLiteral("5 Minute"),CG_PlayerList());
+//    m_lobbies.insert(QStringLiteral("30 Minute"),CG_PlayerList());
+
+    m_dbThread = new QThread(this);
+    m_db.setToAThread(m_dbThread);
+
+    connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials,Qt::QueuedConnection);
+    connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser,Qt::QueuedConnection);
+    connect(&m_db,&CG_Database::userDataSet, this, &CG_Server::userDataSet,Qt::QueuedConnection);
+    connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply,Qt::QueuedConnection);
+    connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified,Qt::QueuedConnection);
+    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendLobbyData,Qt::QueuedConnection);
+
+    m_dbThread->start();
+#ifdef CG_TEST_ENABLED
+    QTest::qExec(&m_db, 0, nullptr);
+#endif
 }
+
 
 
 bool CG_Server::startToListen(QHostAddress addr, quint16 port)
@@ -200,6 +222,34 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             emit fetchLobbies(socket);
             break;
         }
+        case JOIN_MATCHING:{
+            // no parameters only a return
+
+            if(params.count() >= 1)
+            {
+                int game_type = params.at(0).toInt();
+                switch(game_type){
+                    case 0:{
+                    }
+                    case 1:{
+                    }
+                    case 2:{
+                    }
+                    default:break;
+                }
+            }
+            break;
+        }
+        case SET_USER_DATA:{
+            if(params.count() >=3){
+                QString name = params.at(0).toString();
+                QString pass = params.at(1).toString();
+                QByteArray hpass = pass.toLatin1();
+                QString data = params.at(2).toString();
+                m_db.setUserData(socket,name,hpass,data);
+            }
+            break;
+        }
 
         default: break;
     }
@@ -246,6 +296,28 @@ void CG_Server::sendAddUserReply(QWebSocket *socket, bool added, int reason)
     }
 }
 
+void CG_Server::sendConnectedToMatchMaking(QWebSocket *socket, QString type)
+{
+
+}
+
+void CG_Server::sendLobbyData(QWebSocket *socket, QByteArray list)
+{
+
+}
+
+void CG_Server::userDataSet(QWebSocket *socket, bool set)
+{
+    QJsonObject obj;
+    obj["T"] = SET_USER_DATA;
+    QJsonArray params;
+    params.append(set);
+    QJsonDocument doc;
+    obj["P"]=params;
+    doc.setObject(obj);
+    socket->sendBinaryMessage(doc.toBinaryData());
+}
+
 void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
 {
     QJsonObject obj;
@@ -264,16 +336,14 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
         m_connected.insert(socket,player);
         params.append(CG_Database::serializeUser(data));
         data.loggedIn = true;
-        obj["P"]=params;
-        doc.setObject(obj);
-        socket->sendBinaryMessage(doc.toBinaryData());
     }
-    else{
-        obj["P"]=params;
-        doc.setObject(obj);
-        socket->sendBinaryMessage(doc.toBinaryData());
-    }
+    obj["P"]=params;
+    doc.setObject(obj);
+    socket->sendBinaryMessage(doc.toBinaryData());
+
 }
+
+
 
 
 CG_Server::~CG_Server(){

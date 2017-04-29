@@ -9,7 +9,7 @@ typedef struct CG_User
     bool     banned = false;
     QString  username = "";
     int      elo = 0;
-    int      countryFlag = 0;
+    QString  countryFlag = "United States";
     int      pieceSet = 0;
     int      language = 0;
     bool     sound = false;

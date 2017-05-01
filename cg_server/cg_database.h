@@ -72,6 +72,7 @@ public slots:
     bool addUser(QWebSocket* socket,QString str_username, QByteArray pass, QString str_email);
     bool userExists(QString str_username);
     bool setUserData(QWebSocket * socket, QString name, QByteArray pass, QString data);
+    void userRankings(QWebSocket * socket, QString name);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles

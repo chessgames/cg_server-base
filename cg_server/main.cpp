@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
         CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
         #endif
     bool error(false);
-    server.startToListen(QHostAddress("127.0.0.01"),5452);
+    server.startToListen(QHostAddress("127.0.0.1"),5452);
     return a.exec();
 }
     #endif

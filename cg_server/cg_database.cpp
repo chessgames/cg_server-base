@@ -17,19 +17,19 @@
 #include <QtTest/QTest>
 #endif
 
-
+/****************************************************************************************************
+ * The section below defines the SQLITE functions
+ *
+ *
+ *
+ *
+ * **************************************************************************************************/
+#ifdef USE_SQLITE
 CG_Database::CG_Database(QString user_db_path, QString user_name, QString password, QObject *parent)
     : QObject(parent), m_UserDBPath(user_db_path)
 {
-#ifdef USE_SQLITE
     m_dbUser = QSqlDatabase::addDatabase("QSQLITE");
     m_dbUser.setHostName("CG");
-#else
-    m_dbUser = QSqlDatabase::addDatabase("QMYSQL");
-    m_dbUser.setHostName("localhost");
-    m_dbUser.setUserName(user_name);
-    m_dbUser.setPassword(password);
-#endif
 
     if(!databaseExists(user_db_path)){
         #ifndef CG_TEST_ENABLED
@@ -37,12 +37,7 @@ CG_Database::CG_Database(QString user_db_path, QString user_name, QString passwo
         #endif
     }
     else{
-
-        #ifdef USE_SQLITE
-            m_dbUser.setDatabaseName(user_db_path);
-        #else
-            m_dbUser.setDatabaseName("CG_DB");
-        #endif
+        m_dbUser.setDatabaseName(user_db_path);
         // test db exists
 #ifdef CG_TEST_ENABLED
         QVERIFY(m_dbUser.isValid());
@@ -56,6 +51,167 @@ CG_Database::CG_Database(QString user_db_path, QString user_name, QString passwo
 #endif
     }
 }
+
+
+
+
+bool CG_Database::databaseExists(QString path)
+{
+    QDir file(path);
+    return file.exists();
+}
+
+
+
+int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_email)
+{
+    if(puserExists(str_username)){
+        return 1; // cannot add user that already exists
+    }
+    if(pemailExists(str_email)){
+        return 2;
+    }
+
+    int user_id(-1); // should be set to an invalid id
+
+    QSqlQuery qry( m_dbUser);
+    // create settings object
+    CG_User user;
+    QString data =  serializeUser(user);
+    qry.prepare( "INSERT INTO cg_user (name, pass, email, data) VALUES(?, ?, ?,?);" );
+    qry.addBindValue(str_username);
+    qry.addBindValue(pass);
+    qry.addBindValue(str_email);
+    qry.addBindValue(data);
+    if(!qry.exec()){
+        return 3;
+    }
+
+    qry.prepare("SELECT id FROM cg_user WHERE name LIKE ?");
+    qry.addBindValue(str_username);
+    qry.exec();
+    QSqlError err = qry.lastError();
+    if(err.isValid()){
+        return 4;
+    }
+    else
+    {
+        qry.next();
+        user_id = qry.value(0).toInt();
+        qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
+    }
+    return 0;
+}
+
+
+/***************************************************************************************
+ * Below is the Mysql implementations
+ *
+ *
+ *
+ *
+ *
+ *
+ ****************************************************************************************/
+#else
+
+CG_Database::CG_Database(QString user_db_path, QString user_name, QString password, QObject *parent)
+    : QObject(parent), m_UserDBPath(user_db_path)
+{
+
+    m_dbUser = QSqlDatabase::addDatabase("QMYSQL");
+    m_dbUser.setHostName("localhost");
+    m_dbUser.setUserName(user_name);
+    m_dbUser.setPassword(password);
+
+    if(!databaseExists(user_db_path)){
+        #ifndef CG_TEST_ENABLED
+        createUserDatabase();
+        #endif
+    }
+    else{
+        m_dbUser.setDatabaseName("CG_DB");
+#ifdef CG_TEST_ENABLED
+        QVERIFY(m_dbUser.isValid());
+        QVERIFY(m_dbUser.open());
+#else
+        Q_ASSERT(m_dbUser.isValid());
+        m_dbUser.setConnectOptions();
+        // test db connection will open
+        Q_ASSERT(m_dbUser.open());
+        qDebug() << "User Database open.";
+#endif
+    }
+}
+
+bool CG_Database::databaseExists(QString path)
+{
+    QSqlQuery query;
+    query.prepare("SELECT DATABASE CG_DB;");
+    if(query.exec());
+    {
+        if(query.next()){
+            return true;
+        }
+    }
+    return false;
+}
+
+int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_email)
+{
+    if(puserExists(str_username)){
+        return 1; // cannot add user that already exists
+    }
+    if(pemailExists(str_email)){
+        return 2;
+    }
+
+    int user_id(-1); // should be set to an invalid id
+
+    QSqlQuery qry( m_dbUser);
+    // create settings object
+    CG_User user;
+    QString data =  serializeUser(user);
+    QByteArray id_array;
+    id_array.append(str_username);
+    id_array.append(pass);
+    QByteArray uuid = QCryptographicHash::hash(id_array,QCryptographicHash::Sha3_256);
+    qry.prepare( "INSERT INTO cg_user (id, name, pass, email, data) VALUES(?, ?, ?, ?, ?);" );
+    qry.addBindValue(uuid);
+    qry.addBindValue(str_username);
+    qry.addBindValue(pass);
+    qry.addBindValue(str_email);
+    qry.addBindValue(data);
+    if(!qry.exec()){
+        return 3;
+    }
+
+    qry.prepare("SELECT id FROM cg_user WHERE name LIKE ?");
+    qry.addBindValue(str_username);
+    qry.exec();
+    QSqlError err = qry.lastError();
+    if(err.isValid()){
+        return 4;
+    }
+    else
+    {
+        qry.next();
+        user_id = qry.value(0).toInt();
+        qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
+    }
+    return 0;
+}
+#endif
+
+
+/*************************************************************
+ *Below is the functions declared for both situations
+ *
+ *
+ *
+ *
+ *************************************************************/
+
 
 /**************************************************************
 *	  Purpose:  To check whether or not the user exists in the
@@ -112,26 +268,6 @@ bool CG_Database::puserExists(QString str_username)
 }
 
 
-
-bool CG_Database::databaseExists(QString path)
-{
-#ifdef USE_SQLITE
-    QDir file(path);
-    return file.exists();
-#else
-    QSqlQuery query;
-    query.prepare("SELECT DATABASE CG_DB;");
-    if(query.exec());
-    {
-        if(query.next()){
-            return true;
-        }
-    }
-    return false;
-#endif
-}
-
-
 /**************************************************************
 *	  Purpose:  To add a user into the database with the passed
 *               parameters: username, password and email.
@@ -149,58 +285,7 @@ bool CG_Database::addUser(QWebSocket * socket, QString str_username, QByteArray 
     return (added == 0);
 }
 
-int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_email)
-{
-    if(puserExists(str_username)){
-        return 1; // cannot add user that already exists
-    }
-    if(pemailExists(str_email)){
-        return 2;
-    }
 
-    int user_id(-1); // should be set to an invalid id
-
-    QSqlQuery qry( m_dbUser);
-    // create settings object
-    CG_User user;
-    QString data =  serializeUser(user);
-#ifdef USE_SQLITE
-    qry.prepare( "INSERT INTO cg_user (name, pass, email, data) VALUES(?, ?, ?,?);" );
-    qry.addBindValue(str_username);
-    qry.addBindValue(pass);
-    qry.addBindValue(str_email);
-    qry.addBindValue(data);
-#else
-    QByteArray id_array;
-    id_array.append(str_username);
-    id_array.append(pass);
-    QByteArray uuid = QCryptographicHash::hash(id_array,QCryptographicHash::Sha3_256);
-    qry.prepare( "INSERT INTO cg_user (id, name, pass, email, data) VALUES(?, ?, ?, ?, ?);" );
-    qry.addBindValue(uuid);
-    qry.addBindValue(str_username);
-    qry.addBindValue(pass);
-    qry.addBindValue(str_email);
-    qry.addBindValue(data);
-#endif
-    if(!qry.exec()){
-        return 3;
-    }
-
-    qry.prepare("SELECT id FROM cg_user WHERE name LIKE ?");
-    qry.addBindValue(str_username);
-    qry.exec();
-    QSqlError err = qry.lastError();
-    if(err.isValid()){
-        return 4;
-    }
-    else
-    {
-        qry.next();
-        user_id = qry.value(0).toInt();
-        qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
-    }
-    return 0;
-}
 
 #ifndef CG_TEST_ENABLED
 

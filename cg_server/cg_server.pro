@@ -1,7 +1,7 @@
 QT += core websockets sql
 QT -= gui
 
-CONFIG += c++14
+CONFIG += c++11
 
 TARGET = cg_server
 CONFIG += console
@@ -41,3 +41,7 @@ HEADERS += \
     cg_player.h \
     cg_lobby.h \
     cg_lobbymanager.h
+
+unix {
+LIBS += -lmysqlclient
+}

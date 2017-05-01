@@ -34,8 +34,8 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
 }
 
 
-CG_Server::CG_Server(QString db_path, QString name, QString password, QObject *parent)
-    :QObject(parent), m_db(db_path,name,password,nullptr), m_server(nullptr),
+CG_Server::CG_Server(QString db_host_name, QString name, QString password, QObject *parent)
+    :QObject(parent), m_db(db_host_name,name,password,nullptr), m_server(nullptr),
     m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
 {
 //    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());

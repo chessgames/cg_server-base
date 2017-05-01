@@ -56,15 +56,20 @@ int main(int argc, char *argv[])
     #ifdef USE_SQLITE
     CG_Server server("/srv/CG/user.sqlite",&a);
     #else
-    CG_Server server("/var/run/mysqld/mysqld.sock","root","notarealpassword",&a);
+        CG_Server server(QStringLiteral("localhost"),QStringLiteral("root"),QStringLiteral("notarealpassword"),&a);
+
     #endif
     #else
         #ifdef USE_SQLITE
         CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
         #endif
+<<<<<<< HEAD
     bool error(false);
+=======
+    #endif
+>>>>>>> origin/master
     server.startToListen(QHostAddress("127.0.0.1"),5452);
     return a.exec();
 }
-    #endif
+
 #endif

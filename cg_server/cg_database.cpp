@@ -27,13 +27,16 @@ bool CG_Database::createUserDatabase()
     QFileInfo f(m_UserDBPath);
     QString path_to_file = f.absolutePath();
     QFileInfo fdir(path_to_file);
+    bool success(false);
     if( fdir.isDir() && fdir.isWritable()){
         m_dbUser.setDatabaseName(m_UserDBPath);
         m_dbUser.setConnectOptions();
         m_dbUser.open();
-        return createUserTables();
+        success = createUserTables();
+        m_dbUser.close();
     }
-    return false;
+    m_dbUser.open();
+    return success;
 }
 
 bool CG_Database::createUserTables()
@@ -63,14 +66,13 @@ bool CG_Database::connectToDatabase()
 
 bool CG_Database::databaseExists()
 {
-    QFileInfo f(m_UserDBPath);
-    QString path_to_file = f.absolutePath();
-    QFile file(path_to_file);
+    QFile file(m_UserDBPath);
     return file.exists();
 }
 
 int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_email, QString cg_data)
 {
+
     if(puserExists(str_username)){
         return 1; // cannot add user that already exists
     }
@@ -84,7 +86,7 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
     // create settings object
     CG_User user;
     QString data =  serializeUser(user);
-    qry.prepare( "INSERT INTO cg_user (name, pass, email, data) VALUES(?, ?, ?,?);" );
+    qry.prepare( "INSERT INTO cg_user (name, pass, email, data) VALUES(?, ?, ?, ?);" );
     qry.addBindValue(str_username);
     qry.addBindValue(pass);
     qry.addBindValue(str_email);

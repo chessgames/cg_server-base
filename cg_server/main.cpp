@@ -62,21 +62,10 @@ int main(int argc, char *argv[])
 {
     qRegisterMetaType<CG_User>("CG_User");
     QCoreApplication a(argc, argv);
-#ifdef Q_OS_LINUX
-    handleUnixSignals({SIGABRT,SIGINT,SIGQUIT,SIGTERM });
-    #ifdef USE_SQLITE
-    CG_Server server("/srv/CG/user.sqlite",&a);
-    #else
-        CG_Server server(QStringLiteral("localhost"),QStringLiteral("root"),QStringLiteral("notarealpassword"),&a);
-
-    #endif
-    #else
-        #ifdef USE_SQLITE
-        CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
-        #endif
+#ifdef USE_SQLITE
+    CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
+#endif
     server.startToListen(QHostAddress("127.0.0.1"),5452);
     return a.exec();
 }
-
-#endif
 #endif

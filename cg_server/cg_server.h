@@ -53,7 +53,7 @@ class CG_Server : public QObject
     Q_OBJECT
 public:
     CG_Server(QString db_path, QObject *parent = nullptr);
-    CG_Server(QString db_host_name, QString name, QString password, QObject *parent = nullptr);
+    CG_Server(QString db_host_name, QString name, QString password, int db_port, QObject *parent = nullptr);
     bool startToListen(QHostAddress addr, quint16 port);
     int getPlayerCount();
     int getMatchCount();
@@ -65,7 +65,7 @@ public:
 signals:
     void playersReadyToBeMatched();
     void verifyPlayer(QWebSocket * socket, QString name, QByteArray hpass);
-    void addUser(QWebSocket * socket, QString name, QByteArray hpass,QString email);
+    void addUser(QWebSocket * socket, QString name, QByteArray hpass,QString email, QString cg_data);
     void requestSetUserData(QWebSocket * socket, QString name, QByteArray hpass, QString data);
     void fetchLobbies(QWebSocket* socket);
     void notifyPlayerDropped(QString name, QStringList lobbies);

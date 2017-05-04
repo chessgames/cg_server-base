@@ -10,8 +10,8 @@
 * Class: CG_dbManager
 *
 * Constructors:
-*	CG_dbManager(QString str_connection)
-*       Opens the SQLite database for connection based upon the db path passed.
+*   CG_Datbase  requires a hostname, user_name, password - if the db
+*     has no username or password, pass empty strings
 *
 * Methods:
 *   bool UserExists(QString str_username)
@@ -52,12 +52,12 @@ class CG_Database : public QObject
     Q_OBJECT
 public:
 
-    explicit CG_Database(QString host_name, QString user_name, QString password, QObject *parent = nullptr);
+    explicit CG_Database(QString host_name = "", QString user = "", QString password = "", int port= -1, QObject *parent = nullptr);
     ~CG_Database();
 
     static void setUserStruct(CG_User & user, QString name, QString json_settings);
     static QString serializeUser(const CG_User &user);
-    bool databaseExists(QString path);
+    bool databaseExists();
     void setToAThread(QThread* thread);
 
 signals:
@@ -66,47 +66,47 @@ signals:
     void foundUser(QString name, bool found);
     void addUserReply(QWebSocket* socket, bool added, int reason);
     void userDataSet(QWebSocket * socket, bool set);
+    void userRankingUpdated(QWebSocket* socket, int ranking);
 
 public slots:
-    void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
-    bool addUser(QWebSocket* socket,QString str_username, QByteArray pass, QString str_email);
+    bool addUser(QWebSocket* socket, QString str_username, QByteArray pass, QString str_email, QString cg_data);
     bool userExists(QString str_username);
     bool setUserData(QWebSocket * socket, QString name, QByteArray pass, QString data);
+    bool updateUserRanking(QWebSocket* socket,QString name, int rank);
     void userRankings(QWebSocket * socket, QString name);
+    void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
     QSqlDatabase  m_dbGames; // past games
     QString       m_UserDBPath;
-    void createMatchTables();
+    bool connectToDatabase();
     void clearUserDatabase();
-    void createUserTables();
+    void createMatchTables();
+    bool createUserDatabase();
+    bool createUserTables();
+    void initializeDatabase(QString path, QString user, QString password, int port);
 
-    // actualy methods
+    // actual methods
     bool puserExists(QString str_username);
-    int paddUser(QString str_username, QByteArray pass, QString str_email);
+    int  paddUser(QString str_username, QByteArray pass, QString str_email, QString cg_data);
     bool pemailExists(QString str_email);
-    //bool psetUserCredentials(QString str_username, QByteArray new_pass, QByteArray old_pass);
-    //bool pupdateCountryFlag(QString str_username, int country_flag);
-    //bool pupdateUserInfo(CG_User user);
-    //int pgetCountryFlag(QString str_username);
-    //void pencryptPassword(QString & password);
-    bool psetUserData(QString name, QString data);
+    bool psetUserData(QString name, QByteArray hpass, QString data);
+    int puserRankings(QString name);
+    bool pupdateUserRanking(QString name, int rank);
     bool pverifyUserCredentials(QString name, QByteArray pass, CG_User &user);
-    //bool pupdateCurrentELO(QString str_username, int elo);
-    QString pgetCurrentELO(QString str_username);
-    //void pgetUserInfo(CG_User &user, QString str_username);
 
 #ifdef CG_TEST_ENABLED
 private slots:
-    void createUserDatabase();
+    //
     void testAddUser();
     void testAddUser_data();
     void testUserVerify();
     void testUserVerify_data();
-#else
-public:
-    void createUserDatabase();
+    void testUserSetRank();
+    void testUserSetRank_data();
+    void testUserSettingsUpdate();
+    void testUserSettingsUpdate_data();
 
 #endif
 

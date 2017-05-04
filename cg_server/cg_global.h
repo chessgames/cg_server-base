@@ -3,8 +3,9 @@
 
 #include <QString>
 #include <QDebug>
-typedef struct CG_User
+class CG_User
 {
+public:
     bool     loggedIn = false;
     bool     banned = false;
     QString  username = "";
@@ -19,7 +20,12 @@ typedef struct CG_User
     QString  boardTheme = "";
     quint32  cgbitfield = 0;
     bool     isValid = false;
-}CG_User;
+    bool operator ==(const CG_User & right)
+    {
+        return (pieceSet == right.pieceSet && language == right.language && sound == right.sound
+                && coordinates == right.coordinates && arrows == right.arrows && autoPromote == right.autoPromote);
+    }
+};
 
 
 static QDebug operator<<(QDebug dbg, const CG_User &user)

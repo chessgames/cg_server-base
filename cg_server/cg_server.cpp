@@ -11,7 +11,7 @@
 #endif
 
 CG_Server::CG_Server(QString db_path,QObject *parent) :
-    QObject(parent), m_db(db_path,"","",nullptr), m_server(nullptr),
+    QObject(parent), m_db(db_path,"",""), m_server(nullptr),
     m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
 {
 //    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
@@ -34,8 +34,8 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
 }
 
 
-CG_Server::CG_Server(QString db_host_name, QString name, QString password, QObject *parent)
-    :QObject(parent), m_db(db_host_name,name,password,nullptr), m_server(nullptr),
+CG_Server::CG_Server(QString db_host_name, QString name, QString password, int db_port, QObject *parent)
+    :QObject(parent), m_db(db_host_name,name,password,db_port,nullptr), m_server(nullptr),
     m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
 {
 //    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
@@ -198,7 +198,13 @@ void CG_Server::incommingPendingMessage(QByteArray message)
                 QString pass_str = params.at(1).toString();
                 QByteArray hpass = pass_str.toLatin1();
                 QString email = params.at(2).toString();
-                emit addUser(socket,name,hpass,email);
+                if(params.count() > 3){
+                    QString cg = params.at(3).toString();
+                    emit addUser(socket,name,hpass,email,cg);
+                }
+                else{
+                    emit addUser(socket,name,hpass,email,"");
+                }
             }
             break;
         }

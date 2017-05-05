@@ -23,8 +23,8 @@ SOURCES += main.cpp \
 DEFINES += QT_DEPRECATED_WARNINGS
 DEFINES += USE_SQLITE
 #uncomment two lines below to ENABLE testing with QtTest
-DEFINES += CG_TEST_ENABLED
-QT += testlib
+#DEFINES += CG_TEST_ENABLED
+#QT += testlib
 
 # To disable debug output uncomment line below
 #DEFINES += QT_NO_DEBUG_OUTPUT

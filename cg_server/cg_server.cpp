@@ -198,13 +198,11 @@ void CG_Server::incommingPendingMessage(QByteArray message)
                 QString pass_str = params.at(1).toString();
                 QByteArray hpass = pass_str.toLatin1();
                 QString email = params.at(2).toString();
+                QString cg;
                 if(params.count() > 3){
-                    QString cg = params.at(3).toString();
-                    emit addUser(socket,name,hpass,email,cg);
+                    cg= params.at(3).toString();
                 }
-                else{
-                    emit addUser(socket,name,hpass,email,"");
-                }
+                emit addUser(socket,name,hpass,email,cg);
             }
             break;
         }

@@ -60,6 +60,7 @@ void CG_Database::initializeDatabase(QString path, QString user, QString passwor
 
 bool CG_Database::connectToDatabase()
 {
+    m_dbUser.setDatabaseName(m_UserDBPath);
     m_dbUser.setConnectOptions();
     return m_dbUser.open();
 }
@@ -91,24 +92,23 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
     qry.addBindValue(pass);
     qry.addBindValue(str_email);
     qry.addBindValue(data);
-    if(!qry.exec()){
-        return 3;
+    if(qry.exec()){
+        qry.prepare("SELECT id FROM cg_user WHERE name LIKE ?");
+        qry.addBindValue(str_username);
+        qry.exec();
+        QSqlError err = qry.lastError();
+        if(err.isValid()){
+            return 4;
+        }
+        else
+        {
+            qry.next();
+            user_id = qry.value(0).toInt();
+            qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
+            return 0;
+        }
     }
-
-    qry.prepare("SELECT id FROM cg_user WHERE name LIKE ?");
-    qry.addBindValue(str_username);
-    qry.exec();
-    QSqlError err = qry.lastError();
-    if(err.isValid()){
-        return 4;
-    }
-    else
-    {
-        qry.next();
-        user_id = qry.value(0).toInt();
-        qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
-    }
-    return 0;
+    return 3;
 }
 
 
@@ -265,7 +265,6 @@ CG_Database::CG_Database(QString db_path, QString user, QString password, int po
 
 bool CG_Database::userExists(QString str_username)
 {
-    //
     return puserExists(str_username);
 }
 
@@ -295,7 +294,6 @@ bool CG_Database::puserExists(QString str_username)
             found = true;
         }
     }
-    emit foundUser(str_username,found);
     return found;
 }
 
@@ -327,9 +325,10 @@ bool CG_Database::pupdateUserRanking(QString name, int rank)
 
 
 bool CG_Database::pverifyUserCredentials(QString name, QByteArray pass, CG_User & user){
+    m_dbUser.open();
     bool verified(false);
     QSqlQuery qry(m_dbUser);
-    qry.prepare("SELECT * FROM cg_user WHERE name = ? AND pass = ?;");
+    qry.prepare("SELECT * FROM cg_user WHERE name = ? AND pass =?");
     qry.addBindValue(name);
     qry.addBindValue(pass);
     if(qry.exec()){

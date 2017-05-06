@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
     QTest::qExec(&server, argc, argv);
 
 #else
-    server.startToListen(QHostAddress("127.0.0.1"),5452);
+    server.startToListen(QHostAddress("192.168.3.105"),5445);
 #endif
     return a.exec();
 }

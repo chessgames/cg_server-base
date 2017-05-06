@@ -26,6 +26,7 @@ protected:
     QList<CG_Player>         mFiveMinute;
     QList<CG_Player>         mThirtyMinute;
     void matchPlayers(CG_Player black, CG_Player white);
+    void sendPlayerInformation(QWebSocket *socket, CG_Player player, bool color);
    // QMap<QString,CG_PlayerList> m_lobbies;
 };
 

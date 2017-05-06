@@ -78,6 +78,7 @@ public slots:
     void userDataSet(QWebSocket * socket,bool set);
     void sendLobbyData(QWebSocket* socket, QByteArray list);
     void sendConnectedToMatchMaking(QWebSocket * socket, QString type);
+    void sendMatchedPlayer(QWebSocket * socket, QString player_data);
     /*void clientDisconnected();
     void handleJoinQueue(TimeControl time_type);
     void queueTimerExpired();

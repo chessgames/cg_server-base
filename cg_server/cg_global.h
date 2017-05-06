@@ -66,6 +66,7 @@ static const int SEND_MESSAGE =  4512;
 static const int JOIN_LOBBY =  4321;
 static const int LEAVE_LOBBY =  4231;
 static const int FETCH_LOBBIES   =  4555;
+static const int MATCHED_PLAYER   =  4565;
 
 // Game
 static const int JOIN_MATCHING =  5541;

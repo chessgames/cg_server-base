@@ -21,7 +21,7 @@ void CG_LobbyManager::joinMatchMaking(int type, CG_Player black)
             if(mOneMinute.count() > 0)
             {
                 CG_Player white = mOneMinute.takeFirst();
-                matchPlayers(black,white);
+                emit matchedPlayers(black,white,60000);
             }
             else{
                 mOneMinute.append(black);
@@ -32,7 +32,7 @@ void CG_LobbyManager::joinMatchMaking(int type, CG_Player black)
             if(mFiveMinute.count() > 0)
             {
                 CG_Player white = mFiveMinute.takeFirst();
-                matchPlayers(black,white);
+                emit matchedPlayers(black,white,300000);
             }
             else{
                 mFiveMinute.append(black);
@@ -44,7 +44,7 @@ void CG_LobbyManager::joinMatchMaking(int type, CG_Player black)
             if(mThirtyMinute.count() > 0)
             {
                 CG_Player white = mThirtyMinute.takeFirst();
-                matchPlayers(black,white);
+                emit matchedPlayers(black,white,1800000);
             }
             else{
                 mThirtyMinute.append(black);
@@ -56,11 +56,7 @@ void CG_LobbyManager::joinMatchMaking(int type, CG_Player black)
     }
 }
 
-void CG_LobbyManager::matchPlayers(CG_Player black, CG_Player white)
-{
-    sendPlayerInformation(white.mWebSocket,black,true);
-    sendPlayerInformation(black.mWebSocket,white,false);
-}
+
 
 
 void CG_LobbyManager::sendPlayerInformation(QWebSocket *socket, CG_Player player, bool color)
@@ -76,7 +72,11 @@ void CG_LobbyManager::sendPlayerInformation(QWebSocket *socket, CG_Player player
     doc.setObject(obj);
     QString json;
     json = QString::fromLocal8Bit(doc.toJson());
-    emit sendMatchedPlayer(socket,json);
+}
+
+void CG_LobbyManager::setToAThread(QThread *thread)
+{
+    moveToThread(thread);
 }
 
 CG_LobbyManager::~CG_LobbyManager()

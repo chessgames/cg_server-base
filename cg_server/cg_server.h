@@ -10,9 +10,10 @@
 #include "cg_database.h"
 #include "cg_player.h"
 #include "cg_lobbymanager.h"
+#include "cg_gamemanager.h"
+
 class QWebSocketServer;
 typedef QList<CG_Player> CG_PlayerList;
-typedef QMap<QString,CG_PlayerList> CG_Match;
 /************************************************************************
 * Class: CG_Server
 *
@@ -63,39 +64,53 @@ public:
     ~CG_Server();
 
 signals:
-    void playersReadyToBeMatched();
+    // DATABASE SIGNALS
     void verifyPlayer(QWebSocket * socket, QString name, QByteArray hpass);
     void addUser(QWebSocket * socket, QString name, QByteArray hpass,QString email, QString cg_data);
     void requestSetUserData(QWebSocket * socket, QString name, QByteArray hpass, QString data);
+    void requestAddUser(QString user, QByteArray password, QString email);
+
+    // LOBBY MANAGER SIGNALS
     void fetchLobbies(QWebSocket* socket);
+    void notifyFetchGames(QWebSocket * socket, int index);
     void notifyPlayerDropped(QString name, QStringList lobbies);
     void notifyPlayerLeaving(QString name, QStringList lobbies);
-    void requestAddUser(QString user, QByteArray password, QString email);
     void disconnectPlayer(CG_Player);
+
+    // GAME MANAGER SIGNALS
+    void notifyPlayerReady(QWebSocket * socket, quint64 id, QString name);
+    void notifyMakeMove(QWebSocket * socket, QString move_data);
+    void notifyGameResult(QWebSocket *socket, QString result);
+
 public slots:
-    void userVerified(QWebSocket* socket, bool verified, CG_User data);
+    // DATABASE SLOTS
+    void userVerified(QWebSocket* socket, bool verified, QString data);
     void sendAddUserReply(QWebSocket * socket,bool added, int reason);
     void userDataSet(QWebSocket * socket,bool set);
+
+    // LOBY MANAGER SLOTS
     void sendLobbyData(QWebSocket* socket, QByteArray list);
     void sendConnectedToMatchMaking(QWebSocket * socket, QString type);
+
+    // GAME MANAGER SLOTS
     void sendMatchedPlayer(QWebSocket * socket, QString player_data);
-    /*void clientDisconnected();
-    void handleJoinQueue(TimeControl time_type);
-    void queueTimerExpired();
-    void removeMatch();
-    void removePlayerFromQueue();*/
+    void sendSynchronizeGame(QWebSocket* socket, int state);
+    void sendPlayerMadeMove(QWebSocket * socket, QString move_data);
+    void sendReturnMatches(QWebSocket* socket, QString match_data);
+    void sendPlayerPostGame(QWebSocket* socket, QString post_data);
+
 
 protected:
     QThread *                   m_dbThread;
     QThread *                   m_LobbyThread;
-
+    QThread *                   m_gameThread;
     CG_Database                 m_db;
     CG_LobbyManager             m_lobbyManager;
+    CG_GameManager              m_gameManager;
     QWebSocketServer           *m_server;
     QMap<QWebSocket*, CG_Player>m_connected;
     QList<QWebSocket*>          m_pending;
     QMap<QWebSocket*, CG_Player>m_disconnecting;
-    QList<CG_Match>             m_matchList;
     QList<QString>              m_banned;
 
 
@@ -109,13 +124,9 @@ protected slots:
 
     void closePending();
     void pendingDisconnected();
-
-    void incommingDBReply(QString player, QByteArray data);
-    void incommingMatchReply(QString player, QByteArray data);
-    void incommingLobbyReply(QString lobby, QByteArray data);
-
     void playerClosing();
     void playerDropped();
+
 #ifdef CG_TEST_ENABLED
 private slots:
     void testStartListen();

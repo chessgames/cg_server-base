@@ -14,7 +14,10 @@ SOURCES += main.cpp \
     cg_server.cpp \
     cg_player.cpp \
     cg_lobby.cpp \
-    cg_lobbymanager.cpp
+    cg_lobbymanager.cpp \
+    cg_usergraph.cpp \
+    cg_game.cpp \
+    cg_gamemanager.cpp
 
 # The following define makes your compiler emit warnings if you use
 # any feature of Qt which as been marked deprecated (the exact warnings
@@ -40,7 +43,10 @@ HEADERS += \
     cg_global.h \
     cg_player.h \
     cg_lobby.h \
-    cg_lobbymanager.h
+    cg_lobbymanager.h \
+    cg_usergraph.h \
+    cg_game.h \
+    cg_gamemanager.h
 
 unix {
 LIBS += -lmysqlclient

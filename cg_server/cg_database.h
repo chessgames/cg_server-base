@@ -6,6 +6,8 @@
 #include <QSqlDatabase>
 #include <QString>
 #include <QThread>
+#include <QDateTime>
+
 /******************************************************************************
 * Class: CG_dbManager
 *
@@ -31,20 +33,6 @@
 *
 *******************************************************************************/
 
-static const char CG_L[] = "LI";  // Logged in
-static const char CG_BAN[] = "BA";// Banned
-static const char CG_UN[] = "UN"; // Username
-static const char CG_E[] = "EL";  // Elo
-static const char CG_CF[] = "CF"; // Country flag
-static const char CG_PS[] = "PS"; // Piece Set
-static const char CG_LANG[] ="LA";// Language
-static const char CG_SND[] = "SN"; // sound
-static const char CG_CO[] = "CO"; // Co-ordinates
-static const char CG_AR[] = "AR"; // Arrows
-static const char CG_AP[] ="AP"; // Auto Promote
-static const char CG_BT[] ="BT"; // Board Theme
-static const char CG_BF[] ="BF"; // Bit Field
-
 #include <QWebSocket>
 
 class CG_Database : public QObject
@@ -55,14 +43,12 @@ public:
     explicit CG_Database(QString host_name = "", QString user = "", QString password = "", int port= -1, QObject *parent = nullptr);
     ~CG_Database();
 
-    static void setUserStruct(CG_User & user, QString name, QString json_settings);
-    static QString serializeUser(const CG_User &user);
     bool databaseExists();
     void setToAThread(QThread* thread);
 
 signals:
     void databaseLoadComplete();
-    void userVerificationComplete(QWebSocket* socket, bool verified, CG_User data);
+    void userVerificationComplete(QWebSocket* socket, bool verified, QString data);
     void foundUser(QString name, bool found);
     void addUserReply(QWebSocket* socket, bool added, int reason);
     void userDataSet(QWebSocket * socket, bool set);
@@ -75,14 +61,16 @@ public slots:
     bool updateUserRanking(QWebSocket* socket,QString name, int rank);
     void userRankings(QWebSocket * socket, QString name);
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
+    void updateLastGame(int id, int elo_change, bool won, int secs_date, QString game_data);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
     QSqlDatabase  m_dbGames; // past games
     QString       m_UserDBPath;
+
     bool connectToDatabase();
     void clearUserDatabase();
-    void createMatchTables();
+    bool createMatchTables();
     bool createUserDatabase();
     bool createUserTables();
     void initializeDatabase(QString path, QString user, QString password, int port);
@@ -94,7 +82,9 @@ protected:
     bool psetUserData(QString name, QByteArray hpass, QString data);
     int puserRankings(QString name);
     bool pupdateUserRanking(QString name, int rank);
-    bool pverifyUserCredentials(QString name, QByteArray pass, CG_User &user);
+    bool pverifyUserCredentials(QString name, QByteArray pass, QString& data);
+    QString pfetchRecentGame(int player_id);
+    void paddUserMatch(int id);
 
 #ifdef CG_TEST_ENABLED
 private slots:

@@ -7,13 +7,18 @@
 class QWebSocket;
 class CG_Player
 {
+
 public:
     CG_Player();
     ~CG_Player();
 
+    QString serialize();
+
     QList<QString>  mConnectedLobbies;
     CG_User         mUserData;
+    bool            mReady;
     QWebSocket*     mWebSocket;
+
 };
 
 #endif // CG_PLAYER_H

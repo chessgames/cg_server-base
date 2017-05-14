@@ -12,7 +12,7 @@
 
 CG_Server::CG_Server(QString db_path,QObject *parent) :
     QObject(parent), m_db(db_path,"",""), m_server(nullptr),
-    m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
+    m_dbThread(nullptr), m_gameThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
 {
 //    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
 //    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
@@ -23,11 +23,17 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
     m_db.setToAThread(m_dbThread);
     m_dbThread->start();
 
+    m_gameThread = new QThread(this);
+    m_gameManager.setToAThread(m_gameThread);
+    m_gameThread->start();
+
     connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials);
     connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser);
     connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
     connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
-    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendLobbyData);
+    connect(&m_lobbyManager, &CG_LobbyManager::matchedPlayers, &m_gameManager, &CG_GameManager::matchedGame, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::notifiedMatchedGame, this, &CG_Server::sendMatchedPlayer, Qt::QueuedConnection);
+    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendLobbyData,Qt::QueuedConnection);
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
 #endif
@@ -45,14 +51,20 @@ CG_Server::CG_Server(QString db_host_name, QString name, QString password, int d
 
     m_dbThread = new QThread(this);
     m_db.setToAThread(m_dbThread);
+    m_dbThread->start();
 
-    connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials,Qt::QueuedConnection);
-    connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser,Qt::QueuedConnection);
-    connect(&m_db,&CG_Database::userDataSet, this, &CG_Server::userDataSet,Qt::QueuedConnection);
-    connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply,Qt::QueuedConnection);
-    connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified,Qt::QueuedConnection);
+    m_gameThread = new QThread(this);
+    m_gameManager.setToAThread(m_gameThread);
+    m_gameThread->start();
+
+    connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials);
+    connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser);
+    connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
+    connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
+    connect(&m_lobbyManager, &CG_LobbyManager::matchedPlayers, &m_gameManager, &CG_GameManager::matchedGame, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::notifiedMatchedGame, this, &CG_Server::sendMatchedPlayer, Qt::QueuedConnection);
     connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendLobbyData,Qt::QueuedConnection);
-    connect(&m_lobbyManager, &CG_LobbyManager::sendMatchedPlayer, this, &CG_Server::sendMatchedPlayer,Qt::QueuedConnection);
+
 
     m_dbThread->start();
 #ifdef CG_TEST_ENABLED
@@ -107,7 +119,7 @@ void CG_Server::closeServer()
 
 int CG_Server::getMatchCount()
 {
-    return m_matchList.count();
+    return m_gameManager.matchCount();
 }
 
 int CG_Server::getPlayerCount()
@@ -152,20 +164,6 @@ void CG_Server::incommingConnection()
 }
 
 
-void CG_Server::incommingDBReply(QString player, QByteArray data)
-{
-
-}
-
-void CG_Server::incommingLobbyReply(QString lobby, QByteArray data)
-{
-
-}
-
-void CG_Server::incommingMatchReply(QString player, QByteArray data)
-{
-
-}
 
 void CG_Server::incommingPendingMessage(QByteArray message)
 {
@@ -228,7 +226,22 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             emit fetchLobbies(socket);
             break;
         }
-        case JOIN_MATCHING:{
+        case SEND_SYNC:{
+            if(params.count() >= 2){
+                quint64  id(params.at(0).toDouble());
+                QString name(params.at(1).toString());
+                emit notifyPlayerReady(socket,id,name);
+            }
+            break;
+        }
+        case SEND_RESULT:{
+            if(params.count() >= 1){
+                QString result(params.at(0).toString());
+                emit notifyGameResult(socket,result);
+            }
+            break;
+        }
+        case JOIN_MATCHMAKING:{
             // no parameters only a return
 
             if(params.count() >= 1 && (player.mWebSocket == socket))
@@ -249,7 +262,10 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             break;
         }
         case SEND_MOVE:{
-            if(params.count())
+            if(params.count() > 1){
+                QString move(params.at(0).toString());
+                emit notifyMakeMove(socket,move);
+            }
             break;
         }
 
@@ -331,7 +347,57 @@ void CG_Server::sendMatchedPlayer(QWebSocket *socket, QString player_data)
     doc.setObject(obj);
     socket->sendBinaryMessage(doc.toBinaryData());
 }
-void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
+
+void CG_Server::sendSynchronizeGame(QWebSocket *socket, int state)
+{
+    QJsonObject obj;
+    obj["T"] = SEND_SYNC;
+    QJsonArray params;
+    params.append(state);
+    QJsonDocument doc;
+    obj["P"]=params;
+    doc.setObject(obj);
+    socket->sendBinaryMessage(doc.toBinaryData());
+}
+
+
+void CG_Server::sendReturnMatches(QWebSocket *socket, QString match_data)
+{
+    QJsonObject obj;
+    obj["T"] = FETCH_GAMES;
+    QJsonArray params;
+    params.append(match_data);
+    QJsonDocument doc;
+    obj["P"]=params;
+    doc.setObject(obj);
+    socket->sendBinaryMessage(doc.toBinaryData());
+}
+
+void CG_Server::sendPlayerMadeMove(QWebSocket *socket, QString move_data)
+{
+    QJsonObject obj;
+    obj["T"] = SEND_MOVE;
+    QJsonArray params;
+    params.append(move_data);
+    QJsonDocument doc;
+    obj["P"]=params;
+    doc.setObject(obj);
+    socket->sendBinaryMessage(doc.toBinaryData());
+}
+
+void CG_Server::sendPlayerPostGame(QWebSocket *socket, QString post_data)
+{
+    QJsonObject obj;
+    obj["T"] = SEND_RESULT;
+    QJsonArray params;
+    params.append(post_data);
+    QJsonDocument doc;
+    obj["P"]=params;
+    doc.setObject(obj);
+    socket->sendBinaryMessage(doc.toBinaryData());
+}
+
+void CG_Server::userVerified(QWebSocket *socket, bool verified, QString data)
 {
     QJsonObject obj;
     obj["T"] = VERIFY_USER;
@@ -345,10 +411,10 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, CG_User data)
         connect(socket, &QWebSocket::binaryMessageReceived, this, &CG_Server::incommingVerifiedMessage);
         connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::playerClosing);
         connect(socket,&QWebSocket::disconnected, this, &CG_Server::playerDropped);
-        player.mUserData = data;
+        //player.mUserData = data;
         m_connected.insert(socket,player);
-        params.append(CG_Database::serializeUser(data));
-        data.loggedIn = true;
+        //params.append(CG_Database::serializeUser(data));
+        //data.loggedIn = true;
     }
     obj["P"]=params;
     doc.setObject(obj);
@@ -364,6 +430,12 @@ CG_Server::~CG_Server(){
         qDebug() << "Disconnecting server";
         m_server->close(); // will be deleted by CG_Server (QObject)
         m_server->deleteLater();
+    }
+
+    if(m_gameThread){
+        m_gameThread->quit();
+        m_gameThread->exit();
+        m_gameThread->deleteLater();
     }
     if(m_dbThread){
         m_dbThread->quit();

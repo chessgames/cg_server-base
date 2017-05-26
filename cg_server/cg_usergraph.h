@@ -3,15 +3,16 @@
 
 #include <QObject>
 
-class cg_usergraph : public QObject
+class CG_UserGraph : public QObject
 {
     Q_OBJECT
 public:
-    explicit cg_usergraph(QObject *parent = nullptr);
+    explicit CG_UserGraph(QObject *parent = nullptr);
 
 signals:
 
 public slots:
+
 };
 
 #endif // CG_USERGRAPH_H

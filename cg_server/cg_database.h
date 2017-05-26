@@ -7,6 +7,7 @@
 #include <QString>
 #include <QThread>
 #include <QDateTime>
+#include "cg_usergraph.h"
 
 /******************************************************************************
 * Class: CG_dbManager
@@ -65,7 +66,7 @@ public slots:
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
-    QSqlDatabase  m_dbGames; // past games
+    CG_UserGraph  m_graphUser;
     QString       m_UserDBPath;
 
     bool connectToDatabase();

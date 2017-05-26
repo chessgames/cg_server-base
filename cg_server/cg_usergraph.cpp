@@ -1,6 +1,6 @@
 #include "cg_usergraph.h"
 
-cg_usergraph::cg_usergraph(QObject *parent) : QObject(parent)
+CG_UserGraph::CG_UserGraph(QObject *parent) : QObject(parent)
 {
 
 }

@@ -193,7 +193,7 @@ static QDebug operator<<(QDebug dbg, const CG_User &user)
 // server globals
 
 // Login
-static const int VERIFY_USER =  453;
+static const int VERIFY_USER =    453;
 static const int REGISTER_USER =  543;
 
 // Profile
@@ -208,18 +208,34 @@ static const int SEND_MESSAGE     =  4512;
 static const int JOIN_LOBBY       =  4321;
 static const int LEAVE_LOBBY      =  4231;
 static const int FETCH_LOBBIES    =  4555;
-static const int MATCHED_PLAYER   =  4565;
 static const int CANCEL_MATCHING  =  4454;
+static const int FETCH_LIVE       =  4244;
+static const int RECONNECT_GAME   =  4356;
+static const int SPECTATE_GAME    =  4645;
 
 
 // Game
-static const int CHOOSE_COLOR   =  5114;
-static const int SEND_MOVE      =  5345;
-static const int FORFEIT_MATCH  =  5899;
-static const int OPPONENT_CHANGED =5235;
-static const int SEND_SYNC      =  5461;
-static const int SEND_RESULT    =  5246;
+static const int CHOOSE_ATTRIB  =   5114;
+static const int SEND_MOVE      =   5345;
+static const int RESIGN_GAME    =   5899;
+static const int SEND_SYNC      =   5236;
+static const int SEND_RESULT    =   5246;
+static const int DRAW           =   5234;
+static const int OPPONENT_DC    =   5232;
 
+
+// SERVER to Client ONLY
+
+//Game
+static const int PLAYER_RECONNECT     =  5344;
+static const int OPPONENT_RECONNECT   =  5346;
+static const int OPPONENT_CHOOSE      =  5344;
+static const int OPPONENT_CHANGE      =  5235;
+
+//Lobby
+static const int MATCHED_PLAYER   =  4544;
+static const int LIVE_GAMES       =  4244;
+static const int PENDING_GAME     =  4354;
 
 
 #endif // CG_GLOBAL_H

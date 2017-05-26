@@ -236,37 +236,11 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
     CG_Player player = m_connected.value(socket);
     switch(target)
     {
+
+        // LOBBY Messages
         case FETCH_LOBBIES:{
             // no parameters only a return
             emit fetchLobbies(socket);
-            break;
-        }
-        case SEND_SYNC:{
-            if(params.count() >= 1){
-                quint64  id(params.at(0).toDouble());
-                m_gameManager.sendGameReady(socket,id);
-            }
-            break;
-        }
-        case SEND_RESULT:{
-            if(params.count() >= 5){
-                quint64  id(params.at(0).toDouble());
-                int      result(params.at(1).toInt());
-                QJsonObject move(params.at(2).toObject());
-                QString     fen(params.at(3).toString());
-                QString     last(params.at(4).toString());
-                m_gameManager.sendResult(socket,id,result,move,fen,last);
-            }
-            break;
-        }
-        case SEND_MOVE:{
-            if(params.count() >= 2){
-                quint64 gameid(params.at(0).toDouble());
-                int from(params.at(1).toInt());
-                int to(params.at(2).toInt());
-                QJsonObject move(params.at(3).toObject());
-                m_gameManager.makeMove(socket,gameid,from,to,move);
-            }
             break;
         }
         case JOIN_MATCHMAKING:{
@@ -278,6 +252,35 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             }
             break;
         }
+        // GAME Messages
+        case SEND_SYNC:{
+            if(params.count() >= 1){
+                quint64  id(params.at(0).toDouble());
+                m_gameManager.sendGameReady(socket,id);
+            }
+            break;
+        }
+        case SEND_RESULT:{
+            if(params.count() >= 4){
+                int      result(params.at(0).toInt());
+                QJsonObject move(params.at(1).toObject());
+                QString     fen(params.at(2).toString());
+                QString     last(params.at(3).toString());
+                m_gameManager.sendResult(socket,player.mGameID,result,move,fen,last);
+            }
+            break;
+        }
+        case SEND_MOVE:{
+            if(params.count() >= 2){
+                int from(params.at(0).toInt());
+                int to(params.at(1).toInt());
+                QJsonObject move(params.at(2).toObject());
+                m_gameManager.makeMove(socket,player.mGameID,from,to,move);
+            }
+            break;
+        }
+
+        // PROFILE Messages
         case SET_USER_DATA:{
             if(params.count() >=3){
                 QString name = params.at(0).toString();
@@ -434,7 +437,7 @@ void CG_Server::sendPlayerPostGame(QWebSocket *socket, QString post_data)
 void CG_Server::sendOpponentUpdate(QWebSocket *socket, QString data)
 {
     m_rootobj = QJsonObject();
-    m_rootobj["T"] = OPPONENT_CHANGED;
+    m_rootobj["T"] = OPPONENT_CHANGE;
     QJsonArray params;
     params.append(data);
     m_rootobj["P"]=params;
@@ -454,6 +457,7 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, QString meta, CG
         if(m_disconnecting.contains(user.id)){
             player = m_disconnecting.take(user.id);
             player.mWebSocket = socket;
+            user.loggedIn = true;
             player.mUserData = user;
             if(player.mGameID >= 0){
                 m_gameManager.reconnectPlayer(player.mGameID, player);
@@ -468,10 +472,6 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, QString meta, CG
         connect(socket,&QWebSocket::disconnected, this, &CG_Server::playerDropped);
         connect(socket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(checkPlayerState(QAbstractSocket::SocketError)));
         connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::playerClosing);
-        //player.mUserData = data;
-        m_connected.insert(socket,player);
-        //params.append(CG_Database::serializeUser(data));
-        //data.loggedIn = true;
     }
     m_rootobj["P"]=params;
     m_output.setObject(m_rootobj);

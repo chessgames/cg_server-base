@@ -12,15 +12,17 @@ public:
     CG_Game& operator=(const CG_Game& right);
     void addSpectator(CG_Player spec);
     void removeSpectator(CG_Player spec);
-    void setPgn(QString pgn);
-    CG_Player white();
-    CG_Player black();
-    QWebSocket* socket();
-
-    QWebSocket *setReady(QWebSocket *&socket, QString name);
-    void makeMove(QWebSocket* socket,  quint32 elapsed, QJsonObject &obj, QWebSocket *&out);
-    bool setResult(QWebSocket * socket, QString result, quint64 date, QString &post_datab, QString &post_dataw);
-    QString serialize();
+    void setFEN(QString fen);
+    CG_Player& white();
+    CG_Player& black();
+    bool isValid();
+    QWebSocket* otherSocket(QWebSocket * socket);
+    QWebSocket *setReady(QWebSocket *&socket);
+    QWebSocket *makeMove(QWebSocket* socket,  quint32 elapsed, QJsonObject &obj);
+    int setResult(QWebSocket * socket, int result, int &elo_b, int &elo_w);
+    QJsonObject serialize();
+    QWebSocket * reconnectPlayer(const CG_Player &player, quint64 &id);
+    static quint64 pair(quint64 w, quint64 b);
 
 protected:
     int                 mMoveCount;
@@ -28,10 +30,11 @@ protected:
     int                 mWResult;
     quint64             mBClock;
     quint64             mWClock;
-    QString             mPgn;
+    QString             mCurrentState;
     QList<CG_Player>    mSpectators;
     CG_Player           mBlack;
     CG_Player           mWhite;
+    bool                mValid;
 };
 
 #endif // CG_GAME_H

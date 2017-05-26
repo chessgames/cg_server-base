@@ -43,7 +43,7 @@ bool CG_Database::createUserDatabase()
 bool CG_Database::createUserTables()
 {
     QSqlQuery create_user_tbl(m_dbUser);
-    create_user_tbl.prepare("CREATE TABLE cg_user (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pass BLOB , email TEXT, elo INT, country TEXT, data TEXT);");
+    create_user_tbl.prepare("CREATE TABLE cg_user (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, pass BINARY(32), email TEXT, elo INT, country TEXT, data TEXT);");
     return create_user_tbl.exec();
 }
 
@@ -68,7 +68,7 @@ bool CG_Database::connectToDatabase()
 
 bool CG_Database::databaseExists()
 {
-    QFile file(m_UserDBPath);
+    QFileInfo file(m_UserDBPath);
     return file.exists();
 }
 
@@ -87,13 +87,15 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
     QSqlQuery qry( m_dbUser);
     // create settings object
     CG_User user;
-    QString data =  CG_User::serializeUser(user);
+    QString data =  CG_User::createUserData(user);
     qry.prepare( "INSERT INTO cg_user (name, pass, email, elo, country, data) VALUES(?, ?, ?, ?, ?, ?);" );
     qry.addBindValue(str_username);
     qry.addBindValue(pass);
     qry.addBindValue(str_email);
-    qry.addBindValue(1000);
-    qry.addBindValue("United States");
+    int elo = 1000;
+    qry.addBindValue(elo);
+    QString country = "United States";
+    qry.addBindValue(country);
     qry.addBindValue(data);
     if(qry.exec()){
         qry.prepare("SELECT id FROM cg_user WHERE name LIKE ?");
@@ -103,10 +105,10 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
         if(err.isValid()){
             return 4;
         }
-        else
+        if(qry.next())
         {
-            qry.next();
             user_id = qry.value(0).toInt();
+            qry.finish();
             paddUserMatch(user_id);
             qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
             return 0;
@@ -118,7 +120,7 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
 void CG_Database::paddUserMatch(int id)
 {
     QSqlQuery qry( m_dbUser);
-    qry.prepare( "INSERT INTO cg_matches (id, total, won, date, last) VALUES(?, ?, ?, ?, ?, ?);" );
+    qry.prepare( "INSERT INTO cg_match (id, total, won, date, last) VALUES(?, ?, ?, ?, ?);" );
     qry.addBindValue(id);
     qry.addBindValue(0);
     qry.addBindValue(0);
@@ -183,11 +185,9 @@ bool CG_Database::databaseExists()
     m_dbUser.open();
     QSqlQuery query;
     query.prepare("SELECT DATABASE CG_DB;");
-    if(query.exec());
+    if(query.exec() && query.next());
     {
-        if(query.next()){
-            return true;
-        }
+        return true;
     }
     m_dbUser.close();
     return false;
@@ -230,9 +230,7 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
     if(err.isValid()){
         return 4;
     }
-    else
-    {
-        qry.next();
+    if(qry.next();
         user_id = qry.value(0).toInt();
         qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
     }
@@ -271,7 +269,7 @@ CG_Database::CG_Database(QString db_path, QString user, QString password, int po
 
 
 /*****************************************************************
- *Below is the functions declared for both situations
+ * Below is the functions declared for both situations
  * Often this means the actual implementation is abstracted
  * into a private method (overloaded). or the query is universal
  * sql.
@@ -289,10 +287,9 @@ bool CG_Database::pemailExists(QString str_email)
     QSqlQuery qry( m_dbUser );
     qry.prepare( "SELECT * FROM cg_user WHERE email= ?;" );
     qry.addBindValue(str_email);
-    if(qry.exec()){
-        if(qry.next()){
-            found = true;
-        }
+    if(qry.exec() &&
+       qry.next()){
+        found = true;
     }
     return found;
 }
@@ -302,20 +299,19 @@ QString CG_Database::pfetchRecentGame(int player_id)
 {
     QString data;
     QSqlQuery qry( m_dbUser );
-    qry.prepare( "SELECT * FROM cg_matches WHERE id=?;" );
+    qry.prepare( "SELECT * FROM cg_match WHERE id=?;" );
     qry.addBindValue(player_id);
-    if(qry.exec()){
-        if(qry.next()){
-            QSqlRecord record = qry.record();
-            QJsonObject obj; // build out
-            obj["total"] = record.value(1).toJsonValue();
-            obj["won"] = record.value(2).toJsonValue();
-            obj["date"] = record.value(3).toJsonValue();
-            obj["snap"] = record.value(4).toJsonValue();
-            QJsonDocument doc;
-            doc.setObject(obj);
-            data = doc.toJson();
-        }
+    if(qry.exec() && qry.next()){
+        QSqlRecord record = qry.record();
+        QJsonObject obj; // build out
+        obj["total"] = record.value(1).toJsonValue();
+        obj["won"] = record.value(2).toJsonValue();
+        obj["date"] = record.value(3).toJsonValue();
+        obj["snap"] = record.value(4).toJsonValue();
+        QJsonDocument doc;
+        doc.setObject(obj);
+        data = doc.toJson();
+
     }
     return data;
 }
@@ -326,10 +322,9 @@ bool CG_Database::puserExists(QString str_username)
     QSqlQuery qry( m_dbUser );
     qry.prepare( "SELECT * FROM cg_user WHERE name=?;" );
     qry.addBindValue(str_username);
-    if(qry.exec()){
-        if(qry.next()){
-            found = true;
-        }
+    if(qry.exec() && qry.next()){
+        found = true;
+
     }
     return found;
 }
@@ -340,7 +335,7 @@ int CG_Database::puserRankings(QString name)
     QSqlQuery qry( m_dbUser );
     qry.prepare( "SELECT elo FROM cg_user WHERE name=?;" );
     qry.addBindValue(name);
-    if(qry.exec())
+    if(qry.exec() && qry.next())
     {
         elo = qry.record().value(0).toInt();
     }
@@ -360,35 +355,37 @@ bool CG_Database::pupdateUserRanking(QString name, int rank)
     return false;
 }
 
-
-bool CG_Database::pverifyUserCredentials(QString name, QByteArray pass, QString &data){
+bool CG_Database::pverifyUserCredentials(QString name, QByteArray pass, QString & meta, CG_User &user)
+{
     m_dbUser.open();
     bool verified(false);
     QSqlQuery qry(m_dbUser);
-    qry.prepare("SELECT * FROM cg_user WHERE name = ? AND pass =?");
+    qry.prepare("SELECT * FROM cg_user WHERE name=? AND pass=?;");
     qry.addBindValue(name);
     qry.addBindValue(pass);
-    if(qry.exec()){
-        if(qry.next()){
-            QSqlRecord record = qry.record();
-            QString recent = pfetchRecentGame(record.value(0).toInt());
-            QJsonObject obj;
-            obj["id"] = record.value(0).toJsonValue();
-            obj["elo"] = record.value(4).toJsonValue();
-            obj["country"] = record.value(5).toJsonValue();
-            obj["data"] = record.value(6).toJsonValue();
-            obj["last"] = recent;
-            QJsonDocument doc;
-            doc.setObject(obj);
-            data = doc.toJson();
-            verified = true;
-        }
+    if(qry.exec() && qry.next()){
+        QSqlRecord record = qry.record();
+        int id = record.value(0).toInt();
+        QString recent = pfetchRecentGame(id);
+        QJsonArray array;
+        QString data(record.value(6).toString());
+        CG_User::fromData(user,data);
+        user.id = id;
+        user.username = record.value(1).toString();
+        user.elo = record.value(4).toInt();
+        user.countryFlag = record.value(5).toString();
+        array.append(CG_User::serializeUser(user));
+        array.append(recent);
+        QJsonDocument doc;
+        doc.setArray(array);
+        meta = doc.toJson();
+        verified = true;
     }
     return verified;
 }
 
 
-void CG_Database::updateLastGame(int id, int elo_change, bool won, int secs_date, QString game_data)
+void CG_Database::updateLastGame(int id, int elo_change, quint64 secs_date, QString game_data)
 {
     QString current = pfetchRecentGame(id);
     QJsonDocument doc = QJsonDocument::fromJson(current.toLocal8Bit());
@@ -396,14 +393,14 @@ void CG_Database::updateLastGame(int id, int elo_change, bool won, int secs_date
     int prev_won = record.value("won").toInt();
     int total = record.value("total").toInt();
     total += 1;
-    if(won){
+    if(elo_change > 0){
         prev_won += 1;
     }
     int elo(0);
     QSqlQuery elo_qry( m_dbUser );
     elo_qry.prepare( "SELECT elo FROM cg_user WHERE id=?;" );
     elo_qry.addBindValue(id);
-    if(elo_qry.exec())
+    if(elo_qry.exec() && elo_qry.next())
     {
         elo = elo_qry.record().value(0).toInt();
     }
@@ -413,9 +410,9 @@ void CG_Database::updateLastGame(int id, int elo_change, bool won, int secs_date
     elo_qry.addBindValue(id);
     elo_qry.exec();
     QSqlQuery qry( m_dbUser );
-    qry.prepare( "UPDATE cg_matches SET total=?,won=?,date=?,last=? WHERE id=?);");
+    qry.prepare( "UPDATE cg_match SET total=?,won=?,date=?,last=? WHERE id=?);");
     qry.addBindValue(total);
-    qry.addBindValue(won);
+    qry.addBindValue(prev_won);
     qry.addBindValue(secs_date);
     qry.addBindValue(game_data);
     qry.addBindValue(id);
@@ -425,12 +422,15 @@ void CG_Database::updateLastGame(int id, int elo_change, bool won, int secs_date
 
 
 
-bool CG_Database::psetUserData(QString name, QByteArray hpass, QString data)
+bool CG_Database::psetUserData(QString name, QByteArray hpass, QString data, CG_User & user)
 {
     bool set_data(false);
     QSqlQuery qry(m_dbUser);
-    qry.prepare("UPDATE cg_user set data = ? WHERE name = ? AND pass = ?;");
-    qry.addBindValue(data);
+    CG_User::fromData(user,data);
+    QString db_data = CG_User::createUserData(user);
+    qry.prepare("UPDATE cg_user set country=?,data=? WHERE name = ? AND pass = ?;");
+    qry.addBindValue(user.countryFlag);
+    qry.addBindValue(db_data);
     qry.addBindValue(name);
     qry.addBindValue(hpass);
     if(qry.exec()){
@@ -472,12 +472,13 @@ bool CG_Database::addUser(QWebSocket * socket, QString str_username, QByteArray 
 
 bool CG_Database::setUserData(QWebSocket *socket, QString name, QByteArray pass, QString data)
 {
-    QString user;
-    bool verified = pverifyUserCredentials(name,pass,user);
+    CG_User user;
+    QString meta;
+    bool verified = pverifyUserCredentials(name,pass,meta,user);
     if(verified){
-        verified = psetUserData(name,pass,data);
+        verified = psetUserData(name,pass,data,user);
+        emit userDataRefreshed(socket,user);
     }
-    emit userDataSet(socket,verified);
     return verified;
 }
 
@@ -503,9 +504,10 @@ void CG_Database::userRankings(QWebSocket *socket, QString name)
 
 void CG_Database::verifyUserCredentials(QWebSocket *socket, QString name, QByteArray hpass)
 {
-    QString user;
-    bool verified = pverifyUserCredentials(name, hpass, user);
-    emit userVerificationComplete(socket,verified,user);
+    CG_User user;
+    QString meta;
+    bool verified = pverifyUserCredentials(name, hpass, meta,user);
+    emit userVerificationComplete(socket,verified,meta, user);
 }
 
 

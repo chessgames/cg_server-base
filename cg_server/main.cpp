@@ -61,11 +61,12 @@ int main(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
     qRegisterMetaType<CG_User>("CG_User");
+    qRegisterMetaType<CG_Player>("CG_Player");
     QCoreApplication a(argc, argv);
 #ifdef USE_SQLITE
     CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
 #endif
-    server.startToListen(QHostAddress("127.0.0.1"),5452);
+    server.startToListen(QHostAddress("127.0.0.1"),5445);
     return a.exec();
 }
 #endif

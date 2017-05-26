@@ -18,6 +18,8 @@ static const char CG_LANG[] ="LA";// Language
 static const char CG_TOTL[] ="TG";// Total games played
 static const char CG_WON[] ="WG";// Total Won games
 static const char CG_SND[] = "SN"; // sound
+static const char CG_AV[] = "AV"; // Avatar
+static const char CG_ID[] = "ID"; // User id
 static const char CG_CO[] = "CO"; // Co-ordinates
 static const char CG_AR[] = "AR"; // Arrows
 static const char CG_AP[] ="AP"; // Auto Promote
@@ -28,6 +30,19 @@ static const char CG_BF[] ="BF"; // Bit Field
 class CG_User
 {
 public:
+    CG_User() : loggedIn(false), banned(false), username(""), elo(0), countryFlag("United States"),
+        pieceSet(0), language(0), id(-1), sound(false), coordinates(false), arrows(false), autoPromote(false),
+        total(0), won(0), boardTheme(""), avatar("duck"), cgbitfield(0), isValid(false)
+    {}
+
+    CG_User(const CG_User & right) :
+        loggedIn(right.loggedIn), banned(right.banned), username(right.username), elo(right.elo),
+        countryFlag(right.countryFlag),pieceSet(right.pieceSet),language(right.language),id(right.id),
+        sound(right.sound),coordinates(right.coordinates),arrows(right.arrows),autoPromote(right.autoPromote),
+        total(right.total),won(right.won),boardTheme(right.boardTheme), avatar(right.avatar), cgbitfield(right.cgbitfield),
+        isValid(right.isValid)
+    {}
+
     bool     loggedIn = false;
     bool     banned = false;
     QString  username = "";
@@ -43,21 +58,43 @@ public:
     quint32  total = 0;
     quint32  won = 0;
     QString  boardTheme = "";
-    QString  avatar;
+    QString  avatar = "duck";
     quint32  cgbitfield = 0;
     bool     isValid = false;
     bool operator ==(const CG_User & right)
     {
-        return (pieceSet == right.pieceSet && language == right.language && sound == right.sound
+        return (id == right.id && (username.compare(right.username) == 0) && pieceSet == right.pieceSet && language == right.language && sound == right.sound
                 && coordinates == right.coordinates && arrows == right.arrows && autoPromote == right.autoPromote);
     }
-
-    static void setUserStruct(CG_User & user, QString name, QString json_settings)
+    CG_User& operator=(const CG_User & right)
     {
-        user.username = name;
+        loggedIn = right.loggedIn;
+        banned = right.banned;
+        username = right.username;
+        elo = right.elo;
+        countryFlag = right.countryFlag;
+        pieceSet = right.pieceSet;
+        language = right.language;
+        id = right.id;
+        sound = right.sound;
+        coordinates = right.coordinates;
+        arrows = right.arrows;
+        autoPromote = right.autoPromote;
+        total = right.total;
+        won = right.won;
+        boardTheme = right.boardTheme;
+        avatar = right.avatar;
+        cgbitfield = right.cgbitfield;
+        isValid = right.isValid;
+        return *this;
+    }
+
+    static void fromData(CG_User & user, QString json_settings)
+    {
         QJsonDocument doc = QJsonDocument::fromJson(json_settings.toLocal8Bit());
         QJsonObject obj = doc.object();
         // get data out of obj
+        user.username = obj.value(CG_UN).toString();
         user.arrows = obj.value(CG_AR).toBool();
         user.autoPromote = obj.value(CG_AP).toBool();
         user.banned = obj.value(CG_BAN).toBool();
@@ -71,7 +108,29 @@ public:
         user.language = obj.value(CG_LANG).toInt();
         user.pieceSet = obj.value(CG_PS).toInt();
         user.sound = obj.value(CG_SND).toBool();
+        user.avatar = obj.value(CG_AV).toString();
+        user.id = obj.value(CG_ID).toInt();
         user.isValid = true;
+    }
+    static QString createUserData(const CG_User &user)
+    {
+        QString out;
+        QJsonObject obj;
+        // TODO: Add values from match table
+        obj[CG_AR] =user.arrows;
+        obj[CG_AP] = user.autoPromote;
+        obj[CG_BAN] = user.banned;
+        obj[CG_BT] = user.boardTheme;
+        obj[CG_BF] = int(user.cgbitfield);
+        obj[CG_CO] = user.coordinates;
+        obj[CG_LANG] = user.language;
+        obj[CG_SND] = user.sound;
+        obj[CG_PS] = user.pieceSet;
+        obj[CG_AV] = user.avatar;
+        QJsonDocument doc;
+        doc.setObject(obj);
+        out = doc.toJson();
+        return out;
     }
 
     static QString serializeUser(const CG_User &user)
@@ -93,6 +152,8 @@ public:
         obj[CG_LANG] = user.language;
         obj[CG_SND] = user.sound;
         obj[CG_PS] = user.pieceSet;
+        obj[CG_AV] = user.avatar;
+        obj[CG_ID] = user.id;
         QJsonDocument doc;
         doc.setObject(obj);
         out = doc.toJson();
@@ -109,6 +170,8 @@ static QDebug operator<<(QDebug dbg, const CG_User &user)
         dbg.nospace() << "\nName: " << user.username;
         dbg.nospace() << "\nArrows: " << user.arrows;
         dbg.nospace() << "\nAvatar: " << user.avatar;
+        dbg.nospace() << "\nWon: " << user.won;
+        dbg.nospace() << "\nTotal: " << user.total;
         dbg.nospace() << "\nAutoPromote: " << user.autoPromote;
         dbg.nospace() << "\nBanned: " << user.banned;
         dbg.nospace() << "\nBoardTheme: " << user.boardTheme;
@@ -153,8 +216,7 @@ static const int CANCEL_MATCHING  =  4454;
 static const int CHOOSE_COLOR   =  5114;
 static const int SEND_MOVE      =  5345;
 static const int FORFEIT_MATCH  =  5899;
-static const int AVATAR_CHANGED =  5235;
-static const int FLAG_CHANGED   =  5236;
+static const int OPPONENT_CHANGED =5235;
 static const int SEND_SYNC      =  5461;
 static const int SEND_RESULT    =  5246;
 

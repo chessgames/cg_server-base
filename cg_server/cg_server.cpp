@@ -21,19 +21,14 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
 
     m_dbThread = new QThread(this);
     m_db.setToAThread(m_dbThread);
-    m_dbThread->start();
+
 
     m_gameThread = new QThread(this);
     m_gameManager.setToAThread(m_gameThread);
+    makeConnections();
     m_gameThread->start();
+    m_dbThread->start();
 
-    connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials);
-    connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser);
-    connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
-    connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
-    connect(&m_lobbyManager, &CG_LobbyManager::matchedPlayers, &m_gameManager, &CG_GameManager::matchedGame, Qt::QueuedConnection);
-    connect(&m_gameManager, &CG_GameManager::notifiedMatchedGame, this, &CG_Server::sendMatchedPlayer, Qt::QueuedConnection);
-    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendLobbyData,Qt::QueuedConnection);
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
 #endif
@@ -48,7 +43,7 @@ CG_Server::CG_Server(QString db_host_name, QString name, QString password, int d
 //    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
 //    m_lobbies.insert(QStringLiteral("5 Minute"),CG_PlayerList());
 //    m_lobbies.insert(QStringLiteral("30 Minute"),CG_PlayerList());
-
+    makeConnections();
     m_dbThread = new QThread(this);
     m_db.setToAThread(m_dbThread);
     m_dbThread->start();
@@ -57,22 +52,29 @@ CG_Server::CG_Server(QString db_host_name, QString name, QString password, int d
     m_gameManager.setToAThread(m_gameThread);
     m_gameThread->start();
 
-    connect(this,&CG_Server::verifyPlayer, &m_db, &CG_Database::verifyUserCredentials);
-    connect(this,&CG_Server::addUser, &m_db, &CG_Database::addUser);
-    connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
-    connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
-    connect(&m_lobbyManager, &CG_LobbyManager::matchedPlayers, &m_gameManager, &CG_GameManager::matchedGame, Qt::QueuedConnection);
-    connect(&m_gameManager, &CG_GameManager::notifiedMatchedGame, this, &CG_Server::sendMatchedPlayer, Qt::QueuedConnection);
-    connect(&m_lobbyManager, &CG_LobbyManager::sendLobyList, this, &CG_Server::sendLobbyData,Qt::QueuedConnection);
 
-
-    m_dbThread->start();
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
 #endif
 }
 
 
+void CG_Server::makeConnections()
+{
+    //connect(this, &CG_Server::notifyPlayerLeaving, &m_gameManager, &CG_GameManager::sendPlayerForfeit);
+    connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
+    connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
+    connect(&m_db,&CG_Database::userDataRefreshed, this, &CG_Server::userDataSet, Qt::QueuedConnection);
+    connect(&m_db,&CG_Database::userDataRefreshed, &m_gameManager, &CG_GameManager::sendPlayerUpdate, Qt::QueuedConnection);
+    connect(&m_lobbyManager, &CG_LobbyManager::matchedPlayers, &m_gameManager, &CG_GameManager::matchedGame, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::notifiedMatchedGame, this, &CG_Server::sendMatchedPlayer, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::notifyPlayerChanged, this, &CG_Server::sendOpponentUpdate, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::sendPlayerMadeMove, this, &CG_Server::sendPlayerMadeMove, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::notifySynchronizedGame, this, &CG_Server::sendSynchronizeGame, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::notifyPlayerPostGame, this, &CG_Server::sendPlayerPostGame, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::updateLastGameDb, &m_db, &CG_Database::updateLastGame, Qt::QueuedConnection);
+    connect(&m_lobbyManager, &CG_LobbyManager::sendLobbyList, this, &CG_Server::sendLobbyData,Qt::QueuedConnection);
+}
 
 bool CG_Server::startToListen(QHostAddress addr, quint16 port)
 {
@@ -127,15 +129,22 @@ int CG_Server::getPlayerCount()
     return m_connected.count();
 }
 
-int CG_Server::getQueueCount()
-{
-    //return m_lobbies.value("1M").count();
-}
-
-
 // Server specific protected slots
 
-
+void CG_Server::checkPlayerState(QAbstractSocket::SocketError error)
+{
+    switch(error){ // TODO handle errors
+        case QAbstractSocket::UnconnectedState: break;
+        case QAbstractSocket::HostLookupState: break;
+        case QAbstractSocket::ConnectingState: break;
+        case QAbstractSocket::ConnectedState: break;
+        case QAbstractSocket::BoundState: break;
+        case QAbstractSocket::ListeningState: break;
+        case QAbstractSocket::ClosingState: break;
+        default:break;
+    }
+    // player actually disconnect?
+}
 
 void CG_Server::closePending()
 {
@@ -163,31 +172,38 @@ void CG_Server::incommingConnection()
     connect(socket,&QWebSocket::disconnected, this, &CG_Server::pendingDisconnected);
 }
 
-
-
 void CG_Server::incommingPendingMessage(QByteArray message)
 {
     // Login credentials
     QWebSocket* socket = qobject_cast<QWebSocket*>(sender());
-    QJsonDocument doc = QJsonDocument::fromBinaryData(message);
-    QJsonObject obj = doc.object();
-    if(obj.isEmpty() || doc.isNull() || doc.isEmpty()){
+    m_output = QJsonDocument::fromBinaryData(message);
+    m_rootobj = m_output.object();
+    if(m_rootobj.isEmpty() || m_output.isNull() || m_output.isEmpty()){
         return;
     }
 
-    int target = obj["T"].toInt();
-    QJsonArray params = obj["P"].toArray();
+    int target = m_rootobj["T"].toInt();
+    QJsonArray params = m_rootobj["P"].toArray();
     switch(target)
     {
         case VERIFY_USER:{
             if(params.count() >= 2){
                 QString name = params.at(0).toString();
+                for(CG_Player player: m_connected){
+                    if(player.mUserData.username.compare(name) == 0){
+                        userVerified(socket,false); // deny already connected clients
+                        return;
+                    }
+                }
                 QString pass_str = params.at(1).toString();
                 QByteArray hpass = pass_str.toLatin1();
-                emit verifyPlayer(socket,name,hpass);
+                m_db.verifyUserCredentials(socket,name,hpass);
             }
-            else{
-                qDebug() << "Received verify user command for " << socket->peerAddress();
+            else{ // bad verify message
+                qDebug() << "Received Bad Parmaters "
+                         << params
+                         << "for verify user command from Address "
+                         << socket->peerAddress();
             }
             break;
         }
@@ -201,12 +217,11 @@ void CG_Server::incommingPendingMessage(QByteArray message)
                 if(params.count() > 3){
                     cg= params.at(3).toString();
                 }
-                emit addUser(socket,name,hpass,email,cg);
+                m_db.addUser(socket,name,hpass,email,cg);
             }
             break;
         }
         default: break;
-
     }
 }
 
@@ -214,10 +229,10 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
 {
     QWebSocket * socket = qobject_cast<QWebSocket*>(sender());
     // route a verified player message
-    QJsonDocument doc = QJsonDocument::fromBinaryData(message);
-    QJsonObject obj = doc.object();
-    int target = obj["T"].toInt();
-    QJsonArray params = obj["P"].toArray();
+    m_output = QJsonDocument::fromBinaryData(message);
+    m_rootobj = m_output.object();
+    int target = m_rootobj["T"].toInt();
+   QJsonArray params = m_rootobj["P"].toArray();
     CG_Player player = m_connected.value(socket);
     switch(target)
     {
@@ -227,23 +242,35 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             break;
         }
         case SEND_SYNC:{
-            if(params.count() >= 2){
+            if(params.count() >= 1){
                 quint64  id(params.at(0).toDouble());
-                QString name(params.at(1).toString());
-                emit notifyPlayerReady(socket,id,name);
+                m_gameManager.sendGameReady(socket,id);
             }
             break;
         }
         case SEND_RESULT:{
-            if(params.count() >= 1){
-                QString result(params.at(0).toString());
-                emit notifyGameResult(socket,result);
+            if(params.count() >= 5){
+                quint64  id(params.at(0).toDouble());
+                int      result(params.at(1).toInt());
+                QJsonObject move(params.at(2).toObject());
+                QString     fen(params.at(3).toString());
+                QString     last(params.at(4).toString());
+                m_gameManager.sendResult(socket,id,result,move,fen,last);
+            }
+            break;
+        }
+        case SEND_MOVE:{
+            if(params.count() >= 2){
+                quint64 gameid(params.at(0).toDouble());
+                int from(params.at(1).toInt());
+                int to(params.at(2).toInt());
+                QJsonObject move(params.at(3).toObject());
+                m_gameManager.makeMove(socket,gameid,from,to,move);
             }
             break;
         }
         case JOIN_MATCHMAKING:{
             // no parameters only a return
-
             if(params.count() >= 1 && (player.mWebSocket == socket))
             {
                 int game_type = params.at(0).toInt();
@@ -261,13 +288,6 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             }
             break;
         }
-        case SEND_MOVE:{
-            if(params.count() > 1){
-                QString move(params.at(0).toString());
-                emit notifyMakeMove(socket,move);
-            }
-            break;
-        }
 
         default: break;
     }
@@ -279,8 +299,26 @@ void CG_Server::playerClosing()
 {
     QWebSocket * socket = qobject_cast<QWebSocket*>(sender());
     CG_Player player = m_connected.take(socket);
-    emit notifyPlayerLeaving(player.mUserData.username,player.mConnectedLobbies);
-    emit disconnectPlayer(player);
+    QWebSocketProtocol::CloseCode c = socket->closeCode();
+    socket->disconnect();
+    if(player.mGameID > 0){
+        m_gameManager.sendPlayerForfeit(player);
+    }
+    if(player.mConnectedLobbies.length() > 0){
+        // something mlobby
+    }
+    switch(c){
+        // handle different disconnect reasons.
+        case QWebSocketProtocol::CloseCodeGoingAway:{ // normal logout
+            break;
+        }
+        case QWebSocketProtocol::CloseCodeMissingExtension:{ // wrong version of client
+            break;
+        }
+        case QWebSocketProtocol::CloseCodeAbnormalDisconnection:{ // client errored
+            break;
+        }
+    }
 }
 
 
@@ -288,30 +326,23 @@ void CG_Server::playerDropped()
 {
     QWebSocket * socket = qobject_cast<QWebSocket*>(sender());
     CG_Player player = m_connected.take(socket);
-    emit notifyPlayerDropped(player.mUserData.username,player.mConnectedLobbies);
+    //emit notifyPlayerDropped(player.mUserData.username,player.mConnectedLobbies);
     socket->disconnect();
-    m_disconnecting.insert(socket,player);
+    m_disconnecting.insert(player.mUserData.id,player);
 }
 
 
 void CG_Server::sendAddUserReply(QWebSocket *socket, bool added, int reason)
 {
-    QJsonObject obj;
-    obj["T"] = REGISTER_USER;
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = REGISTER_USER;
     QJsonArray params;
     params.append(added);
     params.append(reason);
-    QJsonDocument doc;
-    if(added ){
-        obj["P"]=params;
-        doc.setObject(obj);
-        socket->sendBinaryMessage(doc.toBinaryData());
-    }
-    else{
-        obj["P"]=params;
-        doc.setObject(obj);
-        socket->sendBinaryMessage(doc.toBinaryData());
-    }
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
+
 }
 
 void CG_Server::sendConnectedToMatchMaking(QWebSocket *socket, QString type)
@@ -324,102 +355,127 @@ void CG_Server::sendLobbyData(QWebSocket *socket, QByteArray list)
 
 }
 
-void CG_Server::userDataSet(QWebSocket *socket, bool set)
+void CG_Server::userDataSet(QWebSocket *socket, CG_User user)
 {
-    QJsonObject obj;
-    obj["T"] = SET_USER_DATA;
+    m_connected[socket].mUserData = user; // update local user
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = SET_USER_DATA;
     QJsonArray params;
-    params.append(set);
-    QJsonDocument doc;
-    obj["P"]=params;
-    doc.setObject(obj);
-    socket->sendBinaryMessage(doc.toBinaryData());
+    params.append(CG_User::serializeUser(user));
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
 void CG_Server::sendMatchedPlayer(QWebSocket *socket, QString player_data)
 {
-    QJsonObject obj;
-    obj["T"] = MATCHED_PLAYER;
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = MATCHED_PLAYER;
     QJsonArray params;
     params.append(player_data);
-    QJsonDocument doc;
-    obj["P"]=params;
-    doc.setObject(obj);
-    socket->sendBinaryMessage(doc.toBinaryData());
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
 void CG_Server::sendSynchronizeGame(QWebSocket *socket, int state)
 {
-    QJsonObject obj;
-    obj["T"] = SEND_SYNC;
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = SEND_SYNC;
     QJsonArray params;
     params.append(state);
-    QJsonDocument doc;
-    obj["P"]=params;
-    doc.setObject(obj);
-    socket->sendBinaryMessage(doc.toBinaryData());
+    m_rootobj["P"] = params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
 
 void CG_Server::sendReturnMatches(QWebSocket *socket, QString match_data)
 {
-    QJsonObject obj;
-    obj["T"] = FETCH_GAMES;
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = FETCH_GAMES;
     QJsonArray params;
     params.append(match_data);
     QJsonDocument doc;
-    obj["P"]=params;
-    doc.setObject(obj);
-    socket->sendBinaryMessage(doc.toBinaryData());
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
-void CG_Server::sendPlayerMadeMove(QWebSocket *socket, QString move_data)
+void CG_Server::sendPlayerMadeMove(QWebSocket *socket, int from, int to, QJsonObject move)
 {
-    QJsonObject obj;
-    obj["T"] = SEND_MOVE;
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = SEND_MOVE;
     QJsonArray params;
-    params.append(move_data);
-    QJsonDocument doc;
-    obj["P"]=params;
-    doc.setObject(obj);
-    socket->sendBinaryMessage(doc.toBinaryData());
+    //QJsonObject move;
+    //move["to"] = to;
+    //move["from"] = from;
+    //move["promotion"] = promote;
+    params.append(from);
+    params.append(to);
+    params.append(move);
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    QByteArray data = m_output.toBinaryData();
+    socket->sendBinaryMessage(data);
 }
 
 void CG_Server::sendPlayerPostGame(QWebSocket *socket, QString post_data)
 {
-    QJsonObject obj;
-    obj["T"] = SEND_RESULT;
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = SEND_RESULT;
     QJsonArray params;
     params.append(post_data);
-    QJsonDocument doc;
-    obj["P"]=params;
-    doc.setObject(obj);
-    socket->sendBinaryMessage(doc.toBinaryData());
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
-void CG_Server::userVerified(QWebSocket *socket, bool verified, QString data)
+void CG_Server::sendOpponentUpdate(QWebSocket *socket, QString data)
 {
-    QJsonObject obj;
-    obj["T"] = VERIFY_USER;
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = OPPONENT_CHANGED;
+    QJsonArray params;
+    params.append(data);
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
+}
+
+void CG_Server::userVerified(QWebSocket *socket, bool verified, QString meta, CG_User user)
+{
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = VERIFY_USER;
     QJsonArray params;
     params.append(verified);
-    QJsonDocument doc;
     if(verified ){
         CG_Player player;
-        player.mWebSocket = socket;
+        params.append(meta);
+        if(m_disconnecting.contains(user.id)){
+            player = m_disconnecting.take(user.id);
+            player.mWebSocket = socket;
+            player.mUserData = user;
+            if(player.mGameID >= 0){
+                m_gameManager.reconnectPlayer(player.mGameID, player);
+            }
+        }
+        else{
+            player.mWebSocket = socket;
+            player.mUserData = user;
+        }
         socket->disconnect();
         connect(socket, &QWebSocket::binaryMessageReceived, this, &CG_Server::incommingVerifiedMessage);
-        connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::playerClosing);
         connect(socket,&QWebSocket::disconnected, this, &CG_Server::playerDropped);
+        connect(socket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(checkPlayerState(QAbstractSocket::SocketError)));
+        connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::playerClosing);
         //player.mUserData = data;
         m_connected.insert(socket,player);
         //params.append(CG_Database::serializeUser(data));
         //data.loggedIn = true;
     }
-    obj["P"]=params;
-    doc.setObject(obj);
-    socket->sendBinaryMessage(doc.toBinaryData());
-
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
 

@@ -48,11 +48,11 @@ public:
 
 signals:
     void databaseLoadComplete();
-    void userVerificationComplete(QWebSocket* socket, bool verified, QString data);
+    void userVerificationComplete(QWebSocket* socket, bool verified, QString meta,CG_User user);
     void foundUser(QString name, bool found);
     void addUserReply(QWebSocket* socket, bool added, int reason);
-    void userDataSet(QWebSocket * socket, bool set);
     void userRankingUpdated(QWebSocket* socket, int ranking);
+    void userDataRefreshed(QWebSocket * socket, CG_User user);
 
 public slots:
     bool addUser(QWebSocket* socket, QString str_username, QByteArray pass, QString str_email, QString cg_data);
@@ -61,7 +61,7 @@ public slots:
     bool updateUserRanking(QWebSocket* socket,QString name, int rank);
     void userRankings(QWebSocket * socket, QString name);
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
-    void updateLastGame(int id, int elo_change, bool won, int secs_date, QString game_data);
+    void updateLastGame(int id, int elo_change, quint64 secs_date, QString game_data);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
@@ -79,10 +79,10 @@ protected:
     bool puserExists(QString str_username);
     int  paddUser(QString str_username, QByteArray pass, QString str_email, QString cg_data);
     bool pemailExists(QString str_email);
-    bool psetUserData(QString name, QByteArray hpass, QString data);
+    bool psetUserData(QString name, QByteArray hpass, QString data, CG_User &user);
     int puserRankings(QString name);
     bool pupdateUserRanking(QString name, int rank);
-    bool pverifyUserCredentials(QString name, QByteArray pass, QString& data);
+    bool pverifyUserCredentials(QString name, QByteArray pass, QString &meta, CG_User &user);
     QString pfetchRecentGame(int player_id);
     void paddUserMatch(int id);
 

@@ -10,6 +10,8 @@ class CG_Player
 
 public:
     CG_Player();
+    CG_Player(const CG_Player &right);
+    CG_Player & operator=(const CG_Player &right);
     ~CG_Player();
 
     QString serialize();
@@ -17,8 +19,9 @@ public:
     QList<QString>  mConnectedLobbies;
     CG_User         mUserData;
     bool            mReady;
+    bool            mColor;
     QWebSocket*     mWebSocket;
-
+    quint64         mGameID;
 };
 
 #endif // CG_PLAYER_H

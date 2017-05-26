@@ -65,8 +65,9 @@ void CG_LobbyManager::sendPlayerInformation(QWebSocket *socket, CG_Player player
     map.insert("name",player.mUserData.username);
     map.insert("elo",player.mUserData.elo);
     map.insert("flag",player.mUserData.countryFlag);
-    map.insert("avatar","http://chessgames.com/av/face_320.gif");
+    map.insert("avatar",player.mUserData.avatar);
     map.insert("color",color);
+
     QJsonObject obj = QJsonObject::fromVariantMap(map);
     QJsonDocument doc;
     doc.setObject(obj);

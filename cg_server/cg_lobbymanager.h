@@ -15,7 +15,7 @@ public:
     void setToAThread(QThread *thread);
     ~CG_LobbyManager();
 signals:
-    void sendLobyList(QWebSocket* socket, QByteArray list);
+    void sendLobbyList(QWebSocket* socket, QByteArray list);
     void matchedPlayers(CG_Player black, CG_Player white,quint64 time);
 
 public slots:

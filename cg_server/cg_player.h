@@ -15,6 +15,7 @@ public:
     ~CG_Player();
 
     QString serialize();
+    QJsonObject json();
 
     QList<QString>  mConnectedLobbies;
     CG_User         mUserData;

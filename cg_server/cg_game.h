@@ -18,7 +18,7 @@ public:
     bool isValid();
     QWebSocket* otherSocket(QWebSocket * socket);
     QWebSocket *setReady(QWebSocket *&socket);
-    QWebSocket *makeMove(QWebSocket* socket,  quint32 elapsed, QJsonObject &obj);
+    QWebSocket *makeMove(QWebSocket* socket,  quint32 elapsed, QString fen);
     int setResult(QWebSocket * socket, int result, int &elo_b, int &elo_w);
     QJsonObject serialize();
     QWebSocket * reconnectPlayer(const CG_Player &player, quint64 &id);

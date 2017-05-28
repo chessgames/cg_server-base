@@ -31,12 +31,23 @@ QString CG_Player::serialize()
     obj["flag"] = mUserData.countryFlag;
     obj["elo"] = mUserData.elo;
     obj["avatar"] = mUserData.avatar;
-    obj["id"] = double(mGameID);
+    obj["game_id"] = double(mGameID);
     obj["color"] = mColor;
     doc.setObject(obj);
     return doc.toJson();
 }
 
+QJsonObject CG_Player::json()
+{
+    QJsonObject obj;
+    obj["name"] = mUserData.username;
+    obj["flag"] = mUserData.countryFlag;
+    obj["elo"] = mUserData.elo;
+    obj["avatar"] = mUserData.avatar;
+    obj["game_id"] = double(mGameID);
+    obj["color"] = mColor;
+    return obj;
+}
 
 CG_Player::~CG_Player()
 {

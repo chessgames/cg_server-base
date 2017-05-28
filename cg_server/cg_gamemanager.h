@@ -18,9 +18,9 @@ public:
     int  matchCount();
 signals:
     void returnGames(QWebSocket * socket, QString game_data); //server
-    void sendPlayerMadeMove(QWebSocket * socket,int from, int to, QJsonObject move_data); // server
+    void sendPlayerMadeMove(QWebSocket * socket,int from, int to, QString fen, QString promote); // server
     void notifySynchronizedGame(QWebSocket * socket, int state); // server
-    void notifiedMatchedGame(QWebSocket * socket, QString data); // server
+    void notifiedMatchedGame(QWebSocket * socket, QJsonObject data); // server
     void notifyPlayerChoseColor(QWebSocket * socket, QString data); // server
     void updateLastGameDb(int id, int elo_change, quint64 date, QString game_data);  //lobby
     void notifyPlayerPostGame(QWebSocket* socket,  QString post_data);
@@ -31,7 +31,7 @@ signals:
 public slots:
     void matchedGame(CG_Player black, CG_Player white, quint64 time);  // lobby
     void fetchGames(QWebSocket * socket,int index); // server request
-    void makeMove(QWebSocket * socket, quint64 id, int from, int to, QJsonObject move_data); // server request
+    void makeMove(QWebSocket * socket, quint64 id, int from, int to, QString fen, QString promote); // server request
     void sendGameReady(QWebSocket* socket, quint64 id); // server request
     void chooseColor(QWebSocket * socket, quint64 id, bool color);
     void sendResult(QWebSocket * socket, quint64 id, int result, QJsonObject move, QString fen, QString last);

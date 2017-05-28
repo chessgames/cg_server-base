@@ -59,9 +59,9 @@ public slots:
     void sendConnectedToMatchMaking(QWebSocket * socket, QString type);
 
     // GAME MANAGER SLOTS
-    void sendMatchedPlayer(QWebSocket * socket, QString player_data);
+    void sendMatchedPlayer(QWebSocket * socket, QJsonObject player_data);
     void sendSynchronizeGame(QWebSocket* socket, int state);
-    void sendPlayerMadeMove(QWebSocket * socket, int from, int to, QJsonObject move_data);
+    void sendPlayerMadeMove(QWebSocket * socket, int from, int to, QString fen, QString promote);
     void sendReturnMatches(QWebSocket* socket, QString match_data);
     void sendPlayerPostGame(QWebSocket* socket, QString post_data);
     void sendOpponentUpdate(QWebSocket* socket, QString data);

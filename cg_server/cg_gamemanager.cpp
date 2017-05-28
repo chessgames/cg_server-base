@@ -29,8 +29,8 @@ void CG_GameManager::matchedGame(CG_Player black, CG_Player white, quint64 time)
     CG_Game *game = new CG_Game(white,black,time);
     mGames.insert(id,game);
 
-    emit notifiedMatchedGame(white.mWebSocket,black.serialize());
-    emit notifiedMatchedGame(black.mWebSocket,white.serialize());
+    emit notifiedMatchedGame(white.mWebSocket,black.json());
+    emit notifiedMatchedGame(black.mWebSocket,white.json());
 }
 
 
@@ -66,17 +66,17 @@ CG_Game* CG_GameManager::findGame(QWebSocket *player)
 }
 
 
-void CG_GameManager::makeMove(QWebSocket *socket, quint64 id, int from, int to, QJsonObject move_data)
+void CG_GameManager::makeMove(QWebSocket *socket, quint64 id, int from, int to, QString fen, QString promote)
 {
    // QJsonDocument doc = QJsonDocument::fromJson(move_data.toLocal8Bit());
    // QJsonObject obj = doc.object();
     //quint32 elapsed_time(obj.value("time").toInt());
     CG_Game *game(mGames.value(id));
 
-    QWebSocket * out(game->makeMove(socket, 4000, move_data));
+    QWebSocket * out(game->makeMove(socket, 4000, fen));
     //game.makeMove(socket,elapsed_time,obj,out);
     //doc.setObject(obj);
-    emit sendPlayerMadeMove(out,from,to,move_data);
+    emit sendPlayerMadeMove(out,from,to,fen,promote);
 }
 
 

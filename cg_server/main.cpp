@@ -1,6 +1,7 @@
 #include <QCoreApplication>
 #include "cg_server.h"
 #include "cg_global.h"
+#include "cg_player.h"
 Q_DECLARE_METATYPE(CG_User)
 
 #ifdef CG_TEST_ENABLED
@@ -37,6 +38,7 @@ void handleUnixSignals(const std::vector<int>& quitSignals,
 int main(int argc, char *argv[])
 {
     qRegisterMetaType<CG_User>("CG_User");
+    qRegisterMetaType<CG_Player>("CG_Player");
     QCoreApplication a(argc, argv);
     a.setAttribute(Qt::AA_Use96Dpi, true);
 

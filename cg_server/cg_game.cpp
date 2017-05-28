@@ -33,20 +33,20 @@ CG_Player& CG_Game::black()
     return mBlack;
 }
 
-QWebSocket* CG_Game::makeMove(QWebSocket *socket, quint32 elapsed, QJsonObject & obj)
+QWebSocket* CG_Game::makeMove(QWebSocket *socket, quint32 elapsed, QString fen)
 {
     QWebSocket* out;
     if(socket == mBlack.mWebSocket){
         out = mWhite.mWebSocket;
         mWClock -= elapsed;
-        obj["time"] = double(mWClock);
+        //obj["time"] = double(mWClock);
     }
     else{
         out = mBlack.mWebSocket;
         mBClock -= elapsed;
-        obj["time"] = double(mBClock);
+        //obj["time"] = double(mBClock);
     }
-    mCurrentState = obj["fen"].toString();
+    mCurrentState = fen;
     return out;
 }
 

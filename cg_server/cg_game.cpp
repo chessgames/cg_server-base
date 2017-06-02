@@ -2,7 +2,7 @@
 #include <math.h>
 CG_Game::CG_Game(CG_Player white, CG_Player black, quint64 time)
     :mWhite(white),mBlack(black),mBClock(time),mWClock(time),
-      mWResult(-5), mBResult(-5), mValid(false), // -1 is valid result (loss) -2 is not
+      mWResult(-5), mBResult(-5),  mWDraw(-3), mBDraw(-3), mValid(false), // -1 is valid result (loss) -2 is not
       mCurrentState("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1")
 {}
 
@@ -10,7 +10,7 @@ CG_Game::CG_Game(CG_Player white, CG_Player black, quint64 time)
 CG_Game::CG_Game(const CG_Game &right)
     :mBlack(right.mBlack), mWhite(right.mWhite),mBClock(right.mBClock),
      mWClock(right.mWClock), mWResult(right.mWResult), mBResult(right.mBResult),
-     mValid(right.mValid), mCurrentState(right.mCurrentState)
+     mWDraw(right.mWDraw), mBDraw(right.mBDraw),mValid(right.mValid), mCurrentState(right.mCurrentState)
 {}
 
 
@@ -20,6 +20,8 @@ CG_Game& CG_Game::operator =(const CG_Game& right)
     mBlack = right.mBlack;
     mWClock = right.mWClock;
     mWResult = right.mWResult;
+    mWDraw = right.mWDraw;
+    mBDraw = right.mBDraw;
     mBResult = right.mBResult;
     mBClock = right.mBClock;
     mValid = right.mValid;
@@ -31,6 +33,10 @@ CG_Game& CG_Game::operator =(const CG_Game& right)
 CG_Player& CG_Game::black()
 {
     return mBlack;
+}
+
+int CG_Game::blackResult(){
+    return mBResult;
 }
 
 QWebSocket* CG_Game::makeMove(QWebSocket *socket, quint32 elapsed, QString fen)
@@ -107,52 +113,104 @@ QWebSocket* CG_Game::setReady(QWebSocket *&socket)
 }
 
 
-int CG_Game::setResult(QWebSocket *socket, int result,  int &elo_b, int &elo_w)
+bool CG_Game::setResult(QWebSocket *socket, int result)
 {
+    bool game_over(false);
     if(mWhite.mWebSocket == socket){ //set corresponding result
         mWResult = result;
+        switch(result){
+            case -5:{  // clearing result (game reset)
+                mBResult = -5;
+                mWResult = -5;
+                break;
+            }
+            case -1:{// lost (by checkmate)
+                if(mBResult == 1){
+                   game_over = true;
+                }
+                break;
+            }
+            case 0:{  //  draw stalemate
+                if(mBResult == 0){
+                    game_over = true;
+                }
+                break;
+            }
+            case 1:{   //  won (by checkmate)
+                if(mBResult == -1){
+                    game_over = true;
+                }
+                break;
+            }
+            case 2:{ // white resigned
+                mBResult = 2;
+                mWResult = -2;
+                game_over = true;
+                break;
+            }
+            case 3:{   // draw threefold
+                if(mBResult == 3){
+                    game_over = true;
+                }
+                break;
+            }
+            case 4:{  // draw inssuficient material
+                if(mBResult == 4){
+                    game_over = true;
+                }
+                break;
+            }
+        default: qDebug() << "Bad result received game " << this->mWhite.mGameID <<  " from " << this->mWhite.mUserData.username;
+        }
     }
     else{
         mBResult = result;
-    }
-    if(mWResult == -5){ // not set
-        return -5;
-    }
-    if(mBResult == -5){ // not set
-        return -5;
-    }
-    if(mWResult < -1 || mWResult > 1)
-    {
-        qDebug() << "Errored Result White client " << "Result: " << mWResult << " for " << mWhite.mUserData.username  <<" @ " << mWhite.mWebSocket->peerAddress();
-       mWResult = mBResult;
-    }
-
-    if(mBResult < -1 || mBResult > 1)
-    {
-        qDebug() << "Errored Result Black client " << "Result: " << mBResult << " for " << mBlack.mUserData.username  <<" @ " << mBlack.mWebSocket->peerAddress();
-        mBResult = mWResult;
-    }
-    if(abs(mWResult) == abs(mBResult) ){ // both 1 or both 0
-        // somebody won or it is a draw
-        if(mWResult == 0){ // draw
-            elo_b = 0;
-            elo_w = 0;
-            return 0;
-        }
-        else{
-            if(mWResult == 1){ //white wone
-                elo_w = 15;
-                elo_b = -15;
-                return 1;
+        switch(result){
+            case -5:{  // clearing result (game reset)
+                mBResult = -5;
+                mWResult = -5;
+                break;
             }
-            else{  // black won
-                elo_w = -15;
-                elo_b = 15;
-                return -1;
+            case -1:{// lost (by checkmate)
+                if(mWResult == 1){
+                   game_over = true;
+                }
+                break;
             }
+            case 0:{  //  draw stalemate
+                if(mWResult == 0){
+                    game_over = true;
+                }
+                break;
+            }
+            case 1:{   //  won (by checkmate)
+                if(mWResult == -1){
+                    game_over = true;
+                }
+                break;
+            }
+            case 2:{ // black resigned
+                mWResult = 2;
+                mBResult = -2;
+                game_over = true;
+                break;
+            }
+            case 3:{   // draw threefold
+                if(mWResult == 3){
+                    game_over = true;
+                }
+                break;
+            }
+            case 4:{  // draw inssuficient material
+                if(mWResult == 4){
+                    game_over = true;
+                }
+                break;
+            }
+        default: qDebug() << "Bad result received game " << this->mBlack.mGameID <<  " from " << this->mBlack.mUserData.username;
         }
     }
-    return -5;
+    return game_over;
 }
 
 QWebSocket * CG_Game::reconnectPlayer(const CG_Player &player,quint64 & id)
@@ -170,8 +228,17 @@ QWebSocket * CG_Game::reconnectPlayer(const CG_Player &player,quint64 & id)
     }
 }
 
+int CG_Game::setDraw(QWebSocket *socket, int draw)
+{
+
+}
 
 CG_Player& CG_Game::white()
 {
     return mWhite;
+}
+
+int CG_Game::whiteResult()
+{
+    return mWResult;
 }

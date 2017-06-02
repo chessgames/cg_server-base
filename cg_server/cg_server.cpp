@@ -305,7 +305,7 @@ void CG_Server::playerClosing()
     QWebSocketProtocol::CloseCode c = socket->closeCode();
     socket->disconnect();
     if(player.mGameID > 0){
-        m_gameManager.sendPlayerForfeit(player);
+        m_gameManager.playerDisconnected(socket,player.mGameID);
     }
     if(player.mConnectedLobbies.length() > 0){
         // something mlobby

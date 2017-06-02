@@ -20,6 +20,13 @@ int CG_GameManager::matchCount()
 }
 
 
+void CG_GameManager::calculateEloChange(int result, int& elo, int& op_elo){
+    switch(result){
+
+        default: break;
+    }
+}
+
 void CG_GameManager::matchedGame(CG_Player black, CG_Player white, quint64 time)
 {
     quint64 id = CG_Game::pair(quint64(black.mWebSocket), quint64(white.mWebSocket));
@@ -80,6 +87,11 @@ void CG_GameManager::makeMove(QWebSocket *socket, quint64 id, int from, int to, 
 }
 
 
+void CG_GameManager::playerDisconnected(QWebSocket *socket, quint64 id)
+{
+
+}
+
 
 void CG_GameManager::sendGameReady(QWebSocket* socket, quint64 id)
 {
@@ -117,6 +129,17 @@ void CG_GameManager::reconnectPlayer(quint64 id, CG_Player player)
     }
 }
 
+void CG_GameManager::sendDraw(QWebSocket *socket, int response, quint64 id)
+{
+    CG_Game *game(mGames.value(id));
+    int draw(game->setDraw(socket,response));
+    switch(draw){
+
+    }
+       // emit notifySynchronizedGame(socket, 0);  // 0 == start
+        //emit notifySynchronizedGame(other, 0);  // 0 == start
+}
+
 void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJsonObject move, QString fen, QString last)
 {
     if(mGames.contains(id)){
@@ -124,30 +147,24 @@ void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJso
         int elo_w;
         int elo_b;
         quint64 date = QDateTime::currentSecsSinceEpoch();
-        int finished(game->setResult(socket,result,elo_b,elo_w));
-        if(finished != -5){ // tell clients of finished game
-
+        bool finished(game->setResult(socket,result));
+        if(finished){ // tell clients of finished game
             QJsonObject result_obj;
             result_obj["move"] = move;
             result_obj["fen"] = fen;
             result_obj["game"] = last;
+            elo_w = game->white().mUserData.elo;
+            elo_b = game->black().mUserData.elo;
             QString result_w;
             QJsonDocument doc;
             QString result_b;
-            if(finished == 0){ // draw game
-                result_obj["result"] = 0;
-                doc.setObject(result_obj);
-                result_b = doc.toJson();
-                result_w = result_b;
-            }
-            else{ // white wins
-                result_obj["result"] = finished;
-                doc.setObject(result_obj);
-                result_w = doc.toJson();
-                result_obj["result"]  = (finished * -1);
-                doc.setObject(result_obj);
-                result_b = doc.toJson();
-            }
+            result_obj["result"] = game->whiteResult();
+            doc.setObject(result_obj);
+            result_w = doc.toJson();
+            result_obj["result"]  = game->blackResult();
+            doc.setObject(result_obj);
+            result_b = doc.toJson();
+            calculateEloChange(game->whiteResult(),elo_w,elo_b);
             emit updateLastGameDb(game->white().mUserData.id, elo_w, date, result_w);
             emit updateLastGameDb(game->black().mUserData.id, elo_b, date, result_b);
             emit notifyPlayerPostGame(game->white().mWebSocket, result_w);
@@ -158,50 +175,6 @@ void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJso
     }
 }
 
-void CG_GameManager::sendPlayerForfeit(CG_Player player, QString game_data)
-{
-    if(mGames.contains(player.mGameID)){
-        CG_Game *game(mGames.value(player.mGameID));
-        int elo_w;
-        int elo_b;
-        quint64 date = QDateTime::currentSecsSinceEpoch();
-        game->setResult(player.mWebSocket,-1,elo_b,elo_w);
-        int finished(game->setResult(game->otherSocket(player.mWebSocket),1,elo_b,elo_w));
-        QJsonObject result_obj;
-        result_obj["move"] = QString();
-        result_obj["fen"] = QString();
-        result_obj["game"] = game_data;
-        QString result_w;
-        QJsonDocument doc;
-        QString result_b;
-        if(finished == 0){ // draw game
-            result_obj["result"] = 0;
-            doc.setObject(result_obj);
-            result_b = doc.toJson();
-            result_w = result_b;
-        }
-        else{
-            result_obj["result"] = finished;
-            doc.setObject(result_obj);
-            result_w = doc.toJson();
-            result_obj["result"]  = (finished * -1);
-            doc.setObject(result_obj);
-            result_b = doc.toJson();
-        }
-        emit updateLastGameDb(game->white().mUserData.id, elo_w, date, result_w);
-        emit updateLastGameDb(game->black().mUserData.id, elo_b, date, result_b);
-        if(player.mWebSocket == game->white().mWebSocket){
-            emit notifyPlayerPostGame(game->black().mWebSocket, result_b);
-        }
-        else{
-            emit notifyPlayerPostGame(game->white().mWebSocket, result_w);
-        }
-        quint64 id = CG_Game::pair(quint64(game->black().mWebSocket),quint64(game->white().mWebSocket));
-        game = mGames.take(id);
-        delete game;
-    }
-
-}
 
 void CG_GameManager::sendPlayerUpdate(QWebSocket *socket, CG_User data)
 {

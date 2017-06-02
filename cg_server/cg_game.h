@@ -15,11 +15,14 @@ public:
     void setFEN(QString fen);
     CG_Player& white();
     CG_Player& black();
+    int whiteResult();
+    int blackResult();
     bool isValid();
     QWebSocket* otherSocket(QWebSocket * socket);
     QWebSocket *setReady(QWebSocket *&socket);
     QWebSocket *makeMove(QWebSocket* socket,  quint32 elapsed, QString fen);
-    int setResult(QWebSocket * socket, int result, int &elo_b, int &elo_w);
+    bool setResult(QWebSocket * socket, int result);
+    int  setDraw(QWebSocket * socket, int draw);
     QJsonObject serialize();
     QWebSocket * reconnectPlayer(const CG_Player &player, quint64 &id);
     static quint64 pair(quint64 w, quint64 b);
@@ -28,6 +31,8 @@ protected:
     int                 mMoveCount;
     int                 mBResult;
     int                 mWResult;
+    int                 mWDraw;
+    int                 mBDraw;
     quint64             mBClock;
     quint64             mWClock;
     QString             mCurrentState;

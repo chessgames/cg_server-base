@@ -70,6 +70,7 @@ void CG_Server::makeConnections()
     connect(&m_gameManager, &CG_GameManager::notifiedMatchedGame, this, &CG_Server::sendMatchedPlayer, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::notifyPlayerChanged, this, &CG_Server::sendOpponentUpdate, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::sendPlayerMadeMove, this, &CG_Server::sendPlayerMadeMove, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::sendDrawResponse, this, &CG_Server::sendDraw, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::notifySynchronizedGame, this, &CG_Server::sendSynchronizeGame, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::notifyPlayerPostGame, this, &CG_Server::sendPlayerPostGame, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::updateLastGameDb, &m_db, &CG_Database::updateLastGame, Qt::QueuedConnection);
@@ -279,6 +280,13 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             }
             break;
         }
+        case SEND_DRAW:{
+            if(params.count() >= 1){
+                int draw = params.at(0).toInt();
+                m_gameManager.sendDraw(socket,draw,player.mGameID);
+            }
+            break;
+        }
 
         // PROFILE Messages
         case SET_USER_DATA:{
@@ -366,6 +374,18 @@ void CG_Server::userDataSet(QWebSocket *socket, CG_User user)
     QJsonArray params;
     params.append(CG_User::serializeUser(user));
     m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
+}
+
+
+void CG_Server::sendDraw(QWebSocket *socket, int draw)
+{
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = SEND_DRAW;
+    QJsonArray params;
+    params.append(draw);
+    m_rootobj["P"] = params;
     m_output.setObject(m_rootobj);
     socket->sendBinaryMessage(m_output.toBinaryData());
 }

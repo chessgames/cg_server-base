@@ -133,11 +133,14 @@ void CG_GameManager::sendDraw(QWebSocket *socket, int response, quint64 id)
 {
     CG_Game *game(mGames.value(id));
     int draw(game->setDraw(socket,response));
-    switch(draw){
-
+    if(draw >= 0 && draw <= 2){ // send draw response to other player
+        emit sendDrawResponse(game->otherSocket(socket), draw);
     }
-       // emit notifySynchronizedGame(socket, 0);  // 0 == start
-        //emit notifySynchronizedGame(other, 0);  // 0 == start
+    else{
+        // send reset
+        emit sendDrawResponse(socket, draw);
+        emit sendDrawResponse(game->otherSocket(socket), draw);
+    }
 }
 
 void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJsonObject move, QString fen, QString last)

@@ -65,6 +65,7 @@ public slots:
     void sendReturnMatches(QWebSocket* socket, QString match_data);
     void sendPlayerPostGame(QWebSocket* socket, QString post_data);
     void sendOpponentUpdate(QWebSocket* socket, QString data);
+    void sendDraw(QWebSocket* socket, int draw);
 
 
 protected:

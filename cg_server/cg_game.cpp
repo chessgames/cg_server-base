@@ -230,7 +230,62 @@ QWebSocket * CG_Game::reconnectPlayer(const CG_Player &player,quint64 & id)
 
 int CG_Game::setDraw(QWebSocket *socket, int draw)
 {
+    int ret_val(-3); // bad state
+    if(mWhite.mWebSocket == socket){ // whites response
+        switch(draw){
+            case 0: // white offering draw
+                mWDraw = draw;
+                ret_val = draw;
+                break;
+            case 1: //white accepted
+                if(mBDraw == 0){ // black
+                    ret_val = 1; // send accept
+                }
+                mWDraw = -3;
+                mBDraw = -3;
+                break;
 
+            case 2: //white declined
+                if(mBDraw == 0){ // black offered
+                    ret_val = 2; //send decline
+                }
+                mWDraw = -3;
+                mBDraw = -3;
+                break;
+            default:
+                mWDraw = -3;
+                mBDraw = -3;
+            break;
+        }
+    }
+    else{
+        switch(draw){
+            case 0: // black offering draw
+                mBDraw = draw;
+                ret_val = draw;
+                break;
+            case 1: //black accepted
+                if(mWDraw == 0){ // white offered
+                    ret_val = 1; // send accept
+                }
+                mWDraw = -3;
+                mBDraw = -3;
+                break;
+
+            case 2: // black declined
+                if(mWDraw == 0){ // white offered
+                    ret_val = 2; //send decline
+                }
+                mWDraw = -3;
+                mBDraw = -3;
+                break;
+            default:
+                mWDraw = -3;
+                mBDraw = -3;
+            break;
+        }
+    }
+    return ret_val;
 }
 
 CG_Player& CG_Game::white()

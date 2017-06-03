@@ -136,11 +136,11 @@ void CG_GameManager::sendDraw(QWebSocket *socket, int response, quint64 id)
     if(draw >= 0 && draw <= 2){ // send draw response to other player
         emit sendDrawResponse(game->otherSocket(socket), draw);
     }
-    else{
-        // send reset
-        emit sendDrawResponse(socket, draw);
-        emit sendDrawResponse(game->otherSocket(socket), draw);
-    }
+//    else{
+//        // send reset
+//        emit sendDrawResponse(socket, draw);
+//        emit sendDrawResponse(game->otherSocket(socket), draw);
+//    }
 }
 
 void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJsonObject move, QString fen, QString last)

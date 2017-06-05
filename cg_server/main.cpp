@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
 
     handleUnixSignals({SIGABRT,SIGINT,SIGQUIT,SIGTERM });
 #ifdef USE_SQLITE
-    CG_Server server("/srv/CG/user.sqlite",&a);
+    CG_Server server(a.applicationDirPath() + "user.sqlite",&a);
 #else
     CG_Server server("localhost","root","Sup@FlyChess2017",9654,&a);
 #endif
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
     QTest::qExec(&server, argc, argv);
 
 #else
-    server.startToListen(QHostAddress("192.168.3.105"),5445);
+    server.startToListen(QHostAddress(QHostAddress::Any),5445);
 #endif
     return a.exec();
 }

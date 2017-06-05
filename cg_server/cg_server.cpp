@@ -10,9 +10,9 @@
 #include <QtTest/QTest>
 #endif
 
-CG_Server::CG_Server(QString db_path,QObject *parent) :
+CG_Server::CG_Server(QString db_path, QNetworkConfiguration * config, QObject *parent) :
     QObject(parent), m_db(db_path,"",""), m_server(nullptr),
-    m_dbThread(nullptr), m_gameThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
+    m_dbThread(nullptr), m_gameThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager(), m_networkSession(*config)
 {
 //    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
 //    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
@@ -28,6 +28,9 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
     makeConnections();
     m_gameThread->start();
     m_dbThread->start();
+    m_reconnectTimer.setInterval(1000);
+    m_reconnectTimer.setSingleShot(true);
+
 
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
@@ -35,9 +38,9 @@ CG_Server::CG_Server(QString db_path,QObject *parent) :
 }
 
 
-CG_Server::CG_Server(QString db_host_name, QString name, QString password, int db_port, QObject *parent)
+CG_Server::CG_Server(QString db_host_name, QString name, QString password, int db_port, QNetworkConfiguration *config, QObject *parent)
     :QObject(parent), m_db(db_host_name,name,password,db_port,nullptr), m_server(nullptr),
-    m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager()
+    m_dbThread(nullptr), m_LobbyThread(nullptr), m_lobbyManager(), m_networkSession(*config)
 {
 //    m_lobbies.insert(QStringLiteral("All"),CG_PlayerList());
 //    m_lobbies.insert(QStringLiteral("1 Minute"),CG_PlayerList());
@@ -47,6 +50,8 @@ CG_Server::CG_Server(QString db_host_name, QString name, QString password, int d
     m_dbThread = new QThread(this);
     m_db.setToAThread(m_dbThread);
     m_dbThread->start();
+    m_reconnectTimer.setInterval(1000);
+    m_reconnectTimer.setSingleShot(true);
 
     m_gameThread = new QThread(this);
     m_gameManager.setToAThread(m_gameThread);
@@ -56,11 +61,31 @@ CG_Server::CG_Server(QString db_host_name, QString name, QString password, int d
 #ifdef CG_TEST_ENABLED
     QTest::qExec(&m_db, 0, nullptr);
 #endif
+}
+
+void CG_Server::establishServer()
+{
+    m_server->close();
+    if(m_networkSession.state() == QNetworkSession::Connected){
+        if(!m_server->listen(m_serverAddress, m_serverPort)){
+            m_reconnectTimer.start();
+        }
+        else{
+            qDebug() << "Server is rebound to " << m_server->serverAddress();
+        }
+    }
+    else{
+        m_reconnectTimer.start();
+    }
 }
 
 
 void CG_Server::makeConnections()
 {
+    // netowrk session
+    connect(&m_networkSession, &QNetworkSession::stateChanged,this, &CG_Server::networkStateChanged);
+    connect(&m_reconnectTimer, &QTimer::timeout, this, &CG_Server::establishServer);
+
     //connect(this, &CG_Server::notifyPlayerLeaving, &m_gameManager, &CG_GameManager::sendPlayerForfeit);
     connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
     connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
@@ -84,6 +109,8 @@ bool CG_Server::startToListen(QHostAddress addr, quint16 port)
     if(m_server == nullptr){
         m_server = new QWebSocketServer("CG_Server",QWebSocketServer::NonSecureMode,this); // http connection
     }
+    m_serverPort = port;
+    m_serverAddress = addr;
     connect(m_server, &QWebSocketServer::newConnection, this, &CG_Server::incommingConnection);
     listening = m_server->listen(addr,port);
     if(!listening){
@@ -305,6 +332,27 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
     }
 
 
+}
+
+void CG_Server::networkStateChanged(QNetworkSession::State state)
+{
+    switch(state){
+        case QNetworkSession::Connected:
+        case QNetworkSession::Connecting:
+        {
+            if(!m_reconnectTimer.isActive()){
+                m_reconnectTimer.start();
+            }
+            qDebug() << "Network Re-established, rebinding server soon.";
+            break;
+        }
+        default:
+        {
+            qDebug() << "Lost Network Connection, starting reconnect timer";
+            break;
+        }
+
+    }
 }
 
 void CG_Server::playerClosing()

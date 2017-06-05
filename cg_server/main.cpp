@@ -2,6 +2,8 @@
 #include "cg_server.h"
 #include "cg_global.h"
 #include "cg_player.h"
+#include <QNetworkConfiguration>
+#include <QNetworkConfigurationManager>
 Q_DECLARE_METATYPE(CG_User)
 
 #ifdef CG_TEST_ENABLED
@@ -41,12 +43,14 @@ int main(int argc, char *argv[])
     qRegisterMetaType<CG_Player>("CG_Player");
     QCoreApplication a(argc, argv);
     a.setAttribute(Qt::AA_Use96Dpi, true);
+    QNetworkConfigurationManager mgr;
+    QNetworkConfiguration ap = mgr.defaultConfiguration();
 
     handleUnixSignals({SIGABRT,SIGINT,SIGQUIT,SIGTERM });
 #ifdef USE_SQLITE
-    CG_Server server(a.applicationDirPath() + "user.sqlite",&a);
+    CG_Server server(a.applicationDirPath() + "user.sqlite",&ap,&a);
 #else
-    CG_Server server("localhost","root","Sup@FlyChess2017",9654,&a);
+    CG_Server server("localhost","root","Sup@FlyChess2017",9654,&ap,&a);
 #endif
 
 #ifdef CG_TEST_ENABLED

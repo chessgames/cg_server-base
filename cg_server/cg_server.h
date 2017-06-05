@@ -11,6 +11,10 @@
 #include "cg_player.h"
 #include "cg_lobbymanager.h"
 #include "cg_gamemanager.h"
+#include <QTimer>
+#include <QNetworkSession>
+#include <QNetworkConfiguration>
+
 
 class QWebSocketServer;
 typedef QList<CG_Player> CG_PlayerList;
@@ -32,8 +36,8 @@ class CG_Server : public QObject
 {
     Q_OBJECT
 public:
-    CG_Server(QString db_path, QObject *parent = nullptr);
-    CG_Server(QString db_host_name, QString name, QString password, int db_port, QObject *parent = nullptr);
+    CG_Server(QString db_path, QNetworkConfiguration* config, QObject *parent = nullptr);
+    CG_Server(QString db_host_name, QString name, QString password, int db_port, QNetworkConfiguration * config, QObject *parent = nullptr);
     bool startToListen(QHostAddress addr, quint16 port);
     int getPlayerCount();
     int getMatchCount();
@@ -82,8 +86,10 @@ protected:
     QList<QString>              m_banned;
     QJsonDocument               m_output;
     QJsonObject                 m_rootobj;
-
-
+    QTimer                      m_reconnectTimer;
+    QNetworkSession             m_networkSession;
+    QHostAddress                m_serverAddress;
+    quint16                     m_serverPort;
     // method
     void makeConnections();
 
@@ -100,7 +106,8 @@ protected slots:
     void playerClosing();
     void checkPlayerState(QAbstractSocket::SocketError error);
     void playerDropped();
-
+    void networkStateChanged(QNetworkSession::State state);
+    void establishServer();
 #ifdef CG_TEST_ENABLED
 private slots:
     void testStartListen();

@@ -432,7 +432,7 @@ void CG_Database::updateLastGame(int id, int elo_change, quint64 secs_date, QStr
 
 
 
-bool CG_Database::psetUserData(QString name, QByteArray hpass, QString data, CG_User & user)
+bool CG_Database::psetUserData(QString name, QByteArray hpass, QString data, QString &meta, CG_User & user)
 {
     bool set_data(false);
     QSqlQuery qry(m_dbUser);
@@ -444,6 +444,25 @@ bool CG_Database::psetUserData(QString name, QByteArray hpass, QString data, CG_
     qry.addBindValue(name);
     qry.addBindValue(hpass);
     if(qry.exec()){
+            qry.prepare("SELECT * FROM cg_user WHERE name=?");
+            qry.addBindValue(name);
+            if(qry.exec() && qry.next()){
+                QSqlRecord record = qry.record();
+                int id = record.value(0).toInt();
+                QString recent = pfetchRecentGame(id);
+                QJsonArray array;
+                QString data(record.value(6).toString());
+                CG_User::fromData(user,data);
+                user.id = id;
+                user.username = record.value(1).toString();
+                user.elo = record.value(4).toInt();
+                user.countryFlag = record.value(5).toString();
+                array.append(CG_User::serializeUser(user));
+                array.append(recent);
+                QJsonDocument doc;
+                doc.setArray(array);
+                meta = doc.toJson();
+            }
         set_data = true;
     }
     return set_data;
@@ -486,7 +505,7 @@ bool CG_Database::setUserData(QWebSocket *socket, QString name, QByteArray pass,
     QString meta;
     bool verified = pverifyUserCredentials(name,pass,meta,user);
     if(verified){
-        verified = psetUserData(name,pass,data,user);
+        verified = psetUserData(name,pass,data,meta,user);
         emit userDataRefreshed(socket,meta,user);
     }
     return verified;
@@ -697,7 +716,7 @@ void CG_Database::testUserSettingsUpdate()
                             }
                             break;
                         }
-                        case 'e':{
+                        case 'e':{country
                             if(test.pieceSet != pieceSet){
                                 all_set = false;
                             }
@@ -720,7 +739,7 @@ void CG_Database::testUserSettingsUpdate()
                     QVERIFY(all_set);
                     return;
                 }
-            }
+            }country
             else{
                 if(!result){
                     QEXPECT_FAIL(name.toLocal8Bit().data(),"Failed to fetch user data for test",Continue);

@@ -80,7 +80,7 @@ protected:
     bool puserExists(QString str_username);
     int  paddUser(QString str_username, QByteArray pass, QString str_email, QString cg_data);
     bool pemailExists(QString str_email);
-    bool psetUserData(QString name, QByteArray hpass, QString data, CG_User &user);
+    bool psetUserData(QString name, QByteArray hpass, QString data, QString &meta, CG_User &user);
     int puserRankings(QString name);
     bool pupdateUserRanking(QString name, QString &meta, CG_User &user, int rank);
     bool pverifyUserCredentials(QString name, QByteArray pass, QString &meta, CG_User &user);

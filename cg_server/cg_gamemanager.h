@@ -24,6 +24,7 @@ signals:
     void notifiedMatchedGame(QWebSocket * socket, QJsonObject data); // server
     void notifyPlayerChoseColor(QWebSocket * socket, QString data); // server
     void updateLastGameDb(int id, int elo_change, quint64 date, QString game_data);  //lobby
+    void updatePlayerRank(QWebSocket * socket, QString name, int elo);
     void notifyPlayerPostGame(QWebSocket* socket,  QString post_data);
     void notifyPlayerChanged(QWebSocket * socket, QString data);
     void notifyOpponentReconnect(QWebSocket* socket, QString data);
@@ -37,7 +38,7 @@ public slots:
     void sendGameReady(QWebSocket* socket, quint64 id); // server request
     void chooseColor(QWebSocket * socket, quint64 id, bool color);
     void sendResult(QWebSocket * socket, quint64 id, int result, QJsonObject move, QString fen, QString last);
-    void sendPlayerUpdate(QWebSocket * socket, CG_User data);
+    void sendPlayerUpdate(QWebSocket * socket, QString meta, CG_User data);
     void checkPendingMatch(QWebSocket * socket, quint64 id);
     void playerDisconnected(QWebSocket * socket, quint64 id);
     void reconnectPlayer(quint64 id, CG_Player player);

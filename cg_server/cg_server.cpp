@@ -64,7 +64,7 @@ void CG_Server::makeConnections()
     //connect(this, &CG_Server::notifyPlayerLeaving, &m_gameManager, &CG_GameManager::sendPlayerForfeit);
     connect(&m_db,&CG_Database::addUserReply, this,&CG_Server::sendAddUserReply);
     connect(&m_db,&CG_Database::userVerificationComplete, this, &CG_Server::userVerified);
-    connect(&m_db,&CG_Database::userDataRefreshed, this, &CG_Server::userDataSet, Qt::QueuedConnection);
+    connect(&m_db,&CG_Database::userDataRefreshed, this, &CG_Server::refreshUserData, Qt::QueuedConnection);
     connect(&m_db,&CG_Database::userDataRefreshed, &m_gameManager, &CG_GameManager::sendPlayerUpdate, Qt::QueuedConnection);
     connect(&m_lobbyManager, &CG_LobbyManager::matchedPlayers, &m_gameManager, &CG_GameManager::matchedGame, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::notifiedMatchedGame, this, &CG_Server::sendMatchedPlayer, Qt::QueuedConnection);
@@ -74,6 +74,7 @@ void CG_Server::makeConnections()
     connect(&m_gameManager, &CG_GameManager::notifySynchronizedGame, this, &CG_Server::sendSynchronizeGame, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::notifyPlayerPostGame, this, &CG_Server::sendPlayerPostGame, Qt::QueuedConnection);
     connect(&m_gameManager, &CG_GameManager::updateLastGameDb, &m_db, &CG_Database::updateLastGame, Qt::QueuedConnection);
+    connect(&m_gameManager, &CG_GameManager::updatePlayerRank, &m_db, &CG_Database::updateUserRanking, Qt::QueuedConnection);
     connect(&m_lobbyManager, &CG_LobbyManager::sendLobbyList, this, &CG_Server::sendLobbyData,Qt::QueuedConnection);
 }
 
@@ -461,6 +462,21 @@ void CG_Server::sendOpponentUpdate(QWebSocket *socket, QString data)
     m_rootobj["T"] = OPPONENT_CHANGE;
     QJsonArray params;
     params.append(data);
+    m_rootobj["P"]=params;
+    m_output.setObject(m_rootobj);
+    socket->sendBinaryMessage(m_output.toBinaryData());
+}
+
+void CG_Server::refreshUserData(QWebSocket *socket, QString meta, CG_User user)
+{
+    Q_UNUSED(user)
+    m_rootobj = QJsonObject();
+    m_rootobj["T"] = REFRESH_USER_DATA;
+    QJsonArray params;
+    params.append(meta);
+    CG_Player player = m_connected.take(socket);
+    player.mUserData = user;
+    m_connected.insert(socket,player);
     m_rootobj["P"]=params;
     m_output.setObject(m_rootobj);
     socket->sendBinaryMessage(m_output.toBinaryData());

@@ -53,7 +53,7 @@ public slots:
     void userVerified(QWebSocket* socket, bool verified, QString meta = QString(), CG_User user = CG_User());
     void sendAddUserReply(QWebSocket * socket,bool added, int reason);
     void userDataSet(QWebSocket * socket,CG_User user);
-
+    void refreshUserData(QWebSocket * socket,QString meta, CG_User user);
     // LOBY MANAGER SLOTS
     void sendLobbyData(QWebSocket* socket, QByteArray list);
     void sendConnectedToMatchMaking(QWebSocket * socket, QString type);

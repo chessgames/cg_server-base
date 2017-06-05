@@ -53,7 +53,7 @@ signals:
     void foundUser(QString name, bool found);
     void addUserReply(QWebSocket* socket, bool added, int reason);
     void userRankingUpdated(QWebSocket* socket, int ranking);
-    void userDataRefreshed(QWebSocket * socket, CG_User user);
+    void userDataRefreshed(QWebSocket * socket, QString meta, CG_User user);
 
 public slots:
     bool addUser(QWebSocket* socket, QString str_username, QByteArray pass, QString str_email, QString cg_data);
@@ -82,7 +82,7 @@ protected:
     bool pemailExists(QString str_email);
     bool psetUserData(QString name, QByteArray hpass, QString data, CG_User &user);
     int puserRankings(QString name);
-    bool pupdateUserRanking(QString name, int rank);
+    bool pupdateUserRanking(QString name, QString &meta, CG_User &user, int rank);
     bool pverifyUserCredentials(QString name, QByteArray pass, QString &meta, CG_User &user);
     QString pfetchRecentGame(int player_id);
     void paddUserMatch(int id);

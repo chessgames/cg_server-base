@@ -22,8 +22,27 @@ int CG_GameManager::matchCount()
 
 void CG_GameManager::calculateEloChange(int result, int& elo, int& op_elo){
     switch(result){
-
-        default: break;
+        case -2:{
+            elo = -5;
+            op_elo = 5;
+            break;
+        }
+        case -1: {
+            elo = -5;
+            op_elo = 5;
+            break;
+        }
+        case 1: {
+            elo = -5;
+            op_elo = 5;
+            break;
+        }
+        case 2: {
+            elo = 5;
+            op_elo = -5;
+            break;
+        }
+    default: elo = 0; op_elo = 0;break;
     }
 }
 
@@ -170,6 +189,8 @@ void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJso
             calculateEloChange(game->whiteResult(),elo_w,elo_b);
             emit updateLastGameDb(game->white().mUserData.id, elo_w, date, result_w);
             emit updateLastGameDb(game->black().mUserData.id, elo_b, date, result_b);
+            emit updatePlayerRank(game->white().mWebSocket,game->white().mUserData.username, game->white().mUserData.elo + elo_w);
+            emit updatePlayerRank(game->black().mWebSocket,game->black().mUserData.username,game->black().mUserData.elo +elo_b);
             emit notifyPlayerPostGame(game->white().mWebSocket, result_w);
             emit notifyPlayerPostGame(game->black().mWebSocket, result_b);
             game = mGames.take(id);
@@ -179,8 +200,9 @@ void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJso
 }
 
 
-void CG_GameManager::sendPlayerUpdate(QWebSocket *socket, CG_User data)
+void CG_GameManager::sendPlayerUpdate(QWebSocket *socket, QString meta, CG_User data)
 {
+    Q_UNUSED(meta)
     CG_Game *game(findGame(socket));
     QVariantMap bmap;
     if(game == nullptr){

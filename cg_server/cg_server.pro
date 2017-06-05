@@ -48,6 +48,6 @@ HEADERS += \
     cg_game.h \
     cg_gamemanager.h
 
-unix {
-LIBS += -lmysqlclient
+unix:!mac:{
+#LIBS += -lmysqlclient
 }

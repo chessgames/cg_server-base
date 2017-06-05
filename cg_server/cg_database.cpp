@@ -262,7 +262,9 @@ CG_Database::CG_Database(QString db_path, QString user, QString password, int po
     else{
         Q_ASSERT(connectToDatabase());
     }
-   qDebug() << "User Database open.";
+    if(m_dbUser.open()){
+        qDebug() << "User Database open.";
+    }
 }
 
 #endif

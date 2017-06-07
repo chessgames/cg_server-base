@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
     QTest::qExec(&server, argc, argv);
 
 #else
-    server.startToListen(QHostAddress(QHostAddress::Any),5445);
+    server.startToListen(QHostAddress("127.0.0.1"),5445);
 #endif
     return a.exec();
 }
@@ -69,8 +69,10 @@ int main(int argc, char *argv[])
     qRegisterMetaType<CG_User>("CG_User");
     qRegisterMetaType<CG_Player>("CG_Player");
     QCoreApplication a(argc, argv);
+    QNetworkConfigurationManager mgr;
+    QNetworkConfiguration ap = mgr.defaultConfiguration();
 #ifdef USE_SQLITE
-    CG_Server server(a.applicationDirPath() + "/user.sqlite",&a);
+    CG_Server server(a.applicationDirPath() + "/user.sqlite",&ap,&a);
 #endif
     server.startToListen(QHostAddress("127.0.0.1"),5445);
     return a.exec();

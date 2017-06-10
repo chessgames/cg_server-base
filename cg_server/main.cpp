@@ -73,6 +73,8 @@ int main(int argc, char *argv[])
     QNetworkConfiguration ap = mgr.defaultConfiguration();
 #ifdef USE_SQLITE
     CG_Server server(a.applicationDirPath() + "/user.sqlite",&ap,&a);
+#else
+    CG_Server server("localhost","root","Sup@FlyChess2017",9654,&ap,&a);
 #endif
     server.startToListen(QHostAddress("127.0.0.1"),5445);
     return a.exec();

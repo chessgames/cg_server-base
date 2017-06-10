@@ -50,7 +50,7 @@ public:
     QString  countryFlag = "United States";
     int      pieceSet = 0;
     int      language = 0;
-    int      id;
+    double   id;
     bool     sound = false;
     bool     coordinates = false;
     bool     arrows = false;
@@ -109,7 +109,7 @@ public:
         user.pieceSet = obj.value(CG_PS).toInt();
         user.sound = obj.value(CG_SND).toBool();
         user.avatar = obj.value(CG_AV).toString();
-        user.id = obj.value(CG_ID).toInt();
+        user.id = obj.value(CG_ID).toDouble();
         user.isValid = true;
     }
     static QString createUserData(const CG_User &user)

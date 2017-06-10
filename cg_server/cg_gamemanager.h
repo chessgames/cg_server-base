@@ -23,7 +23,7 @@ signals:
     void notifySynchronizedGame(QWebSocket * socket, int state); // server
     void notifiedMatchedGame(QWebSocket * socket, QJsonObject data); // server
     void notifyPlayerChoseColor(QWebSocket * socket, QString data); // server
-    void updateLastGameDb(int id, int elo_change, quint64 date, QString game_data);  //lobby
+    void updateLastGameDb(double id, int elo_change, double date, QString game_data);  //lobby
     void updatePlayerRank(QWebSocket * socket, QString name, int elo);
     void notifyPlayerPostGame(QWebSocket* socket,  QString post_data);
     void notifyPlayerChanged(QWebSocket * socket, QString data);

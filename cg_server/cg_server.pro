@@ -24,7 +24,7 @@ SOURCES += main.cpp \
 # depend on your compiler). Please consult the documentation of the
 # deprecated API in order to know how to port your code away from it.
 DEFINES += QT_DEPRECATED_WARNINGS
-DEFINES += USE_SQLITE
+#DEFINES += USE_SQLITE
 #uncomment two lines below to ENABLE testing with QtTest
 #DEFINES += CG_TEST_ENABLED
 #QT += testlib
@@ -48,6 +48,11 @@ HEADERS += \
     cg_game.h \
     cg_gamemanager.h
 
-unix:!mac:{
+unix:{
 #LIBS += -lmysqlclient
+}
+
+#INCLUDEPATH +=/usr/local/mysql-5.7.18-macos10.12-x86_64/include
+mac:{
+LIBS +=-L/usr/local/mysql-5.7.18-macos10.12-x86_64/lib -lmysqlclient
 }

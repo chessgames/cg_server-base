@@ -62,7 +62,7 @@ public slots:
     bool updateUserRanking(QWebSocket* socket,QString name, int rank);
     void userRankings(QWebSocket * socket, QString name);
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
-    void updateLastGame(int id, int elo_change, quint64 secs_date, QString game_data);
+    void updateLastGame(double id, int elo_change, double secs_date, QString game_data);
 
 protected:
     QSqlDatabase  m_dbUser; // users and profiles
@@ -84,8 +84,8 @@ protected:
     int puserRankings(QString name);
     bool pupdateUserRanking(QString name, QString &meta, CG_User &user, int rank);
     bool pverifyUserCredentials(QString name, QByteArray pass, QString &meta, CG_User &user);
-    QString pfetchRecentGame(int player_id);
-    void paddUserMatch(int id);
+    QString pfetchRecentGame(double player_id);
+    void paddUserMatch(double id, double total, double won, double date, QString last);
 
 #ifdef CG_TEST_ENABLED
 private slots:

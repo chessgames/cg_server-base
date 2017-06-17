@@ -2,7 +2,7 @@
 #include <QWebSocket>
 
 CG_Player::CG_Player()
- : mReady(false),mWebSocket(nullptr),mGameID(-1), mColor(true)
+ : mReady(false),mWebSocket(nullptr),mGameID(-1), mColor(true), mLatency(0)
 {}
 
 CG_Player::CG_Player(const CG_Player &right):

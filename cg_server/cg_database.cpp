@@ -462,11 +462,24 @@ void CG_Database::updateLastGame(double id, int elo_change, double secs_date, QS
 
 
 
-bool CG_Database::psetUserData(QString name, QByteArray hpass, QString data, QString &meta, CG_User & user)
+bool CG_Database::psetUserData(QString name, QByteArray hpass, QJsonObject &data, QString &meta, CG_User & user)
 {
     bool set_data(false);
     QSqlQuery qry(m_dbUser);
-    CG_User::fromData(user,data);
+    user.arrows = data.value(CG_AR).toBool();
+    user.autoPromote = data.value(CG_AP).toBool();
+    user.avatar = data.value(CG_AV).toString();
+    user.boardTheme = data.value(CG_BT).toString();
+    user.cgbitfield = data.value(CG_BF).toDouble();
+    user.coordinates = data.value(CG_CO).toBool();
+    user.countryFlag = data.value(CG_CF).toString();
+    user.elo = data.value(CG_E).toInt();
+    user.id = data.value(CG_ID).toDouble();
+    user.language = data.value(CG_LANG).toInt();
+    user.pieceSet = data.value(CG_PS).toInt();
+    user.sound = data.value(CG_SND).toBool();
+    user.total = data.value(CG_TOTL).toDouble();
+    user.won = data.value(CG_WON).toDouble();
     QString db_data = CG_User::createUserData(user);
     qry.prepare("UPDATE cg_user set country=?,data=? WHERE name = ? AND pass = ?;");
     qry.addBindValue(user.countryFlag);
@@ -529,7 +542,7 @@ bool CG_Database::addUser(QWebSocket * socket, QString str_username, QByteArray 
 }
 
 
-bool CG_Database::setUserData(QWebSocket *socket, QString name, QByteArray pass, QString data)
+bool CG_Database::setUserData(QWebSocket *socket, QString name, QByteArray pass, QJsonObject data)
 {
     CG_User user;
     QString meta;

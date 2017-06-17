@@ -265,7 +265,6 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
     CG_Player player = m_connected.value(socket);
     switch(target)
     {
-
         // LOBBY Messages
         case FETCH_LOBBIES:{
             // no parameters only a return
@@ -284,7 +283,8 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
         // GAME Messages
         case SEND_SYNC:{
             if(params.count() >= 1){
-                m_gameManager.sendGameReady(socket,player.mGameID);
+                quint64  latency(params.at(0).toDouble());
+                m_gameManager.sendGameReady(socket,player.mGameID,latency);
             }
             break;
         }
@@ -299,12 +299,14 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             break;
         }
         case SEND_MOVE:{
-            if(params.count() >= 2){
+            if(params.count() >= 4){
                 int from(params.at(0).toInt());
                 int to(params.at(1).toInt());
                 QString fen(params.at(2).toString());
                 QString promotion(params.at(3).toString());
-                m_gameManager.makeMove(socket,player.mGameID,from,to,fen,promotion);
+                int move_time(params.at(4).toInt());
+                quint64 latency(params.at(5).toDouble());
+                m_gameManager.makeMove(socket,player.mGameID,from,to,fen,promotion,move_time, latency);
             }
             break;
         }
@@ -322,11 +324,12 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
                 QString name = params.at(0).toString();
                 QString pass = params.at(1).toString();
                 QByteArray hpass = pass.toLatin1();
-                QString data = params.at(2).toString();
+                QJsonObject data = params.at(2).toObject();
                 m_db.setUserData(socket,name,hpass,data);
             }
             break;
         }
+
 
         default: break;
     }
@@ -366,6 +369,7 @@ void CG_Server::playerClosing()
     }
     if(player.mConnectedLobbies.length() > 0){
         // something mlobby
+        m_lobbyManager.leaveMatchMaking(socket);
     }
     switch(c){
         // handle different disconnect reasons.
@@ -402,7 +406,6 @@ void CG_Server::sendAddUserReply(QWebSocket *socket, bool added, int reason)
     m_rootobj["P"]=params;
     m_output.setObject(m_rootobj);
     socket->sendBinaryMessage(m_output.toBinaryData());
-
 }
 
 void CG_Server::sendConnectedToMatchMaking(QWebSocket *socket, QString type)
@@ -453,12 +456,13 @@ void CG_Server::sendMatchedPlayer(QWebSocket *socket, QJsonObject player_data)
     socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
-void CG_Server::sendSynchronizeGame(QWebSocket *socket, int state)
+void CG_Server::sendSynchronizeGame(QWebSocket *socket, int state ,quint64 time)
 {
     m_rootobj = QJsonObject();
     m_rootobj["T"] = SEND_SYNC;
     QJsonArray params;
     params.append(state);
+    params.append(double(time)); // update players time
     m_rootobj["P"] = params;
     m_output.setObject(m_rootobj);
     socket->sendBinaryMessage(m_output.toBinaryData());
@@ -476,7 +480,7 @@ void CG_Server::sendReturnMatches(QWebSocket *socket, QString match_data)
     socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
-void CG_Server::sendPlayerMadeMove(QWebSocket *socket, int from, int to, QString fen, QString promote)
+void CG_Server::sendPlayerMadeMove(QWebSocket *socket, int from, int to, QString fen, QString promote, quint64 time)
 {
     m_rootobj = QJsonObject();
     m_rootobj["T"] = SEND_MOVE;
@@ -485,6 +489,7 @@ void CG_Server::sendPlayerMadeMove(QWebSocket *socket, int from, int to, QString
     move["from"] = from;
     move["fen"] = fen;
     move["promote"] = promote;
+    move["time"] = double(time); //opponents time
     QJsonArray array;
     array.append(move);
     m_rootobj["P"]= array;
@@ -559,12 +564,26 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, QString meta, CG
         connect(socket,&QWebSocket::disconnected, this, &CG_Server::playerDropped);
         connect(socket, SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(checkPlayerState(QAbstractSocket::SocketError)));
         connect(socket,&QWebSocket::aboutToClose,this, &CG_Server::playerClosing);
+        connect(socket,&QWebSocket::pong, this, &CG_Server::socketPong);
+        socket->ping();
     }
     m_rootobj["P"]=params;
     m_output.setObject(m_rootobj);
     socket->sendBinaryMessage(m_output.toBinaryData());
 }
 
+
+void CG_Server::socketPong(quint64 elapsed, const QByteArray &message)
+{
+    QWebSocket * socket = qobject_cast<QWebSocket*>(sender());
+    CG_Player player = m_connected.take(socket);
+    quint64 client_latency =  message.toDouble();
+    qDebug() << "Latency Check for " << player.mUserData.username <<": " << elapsed << "ms";
+    qDebug() << "Client Reported: " << client_latency << "ms";
+    player.mLatency =elapsed;
+    m_connected.insert(socket,player);
+    emit playerPing(socket,elapsed,player.mGameID,player.mUserData.username);
+}
 
 
 

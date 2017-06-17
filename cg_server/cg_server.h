@@ -51,6 +51,7 @@ signals:
     void fetchLobbies(QWebSocket* socket);
     void notifyFetchGames(QWebSocket * socket, int index);
     void disconnectPlayer(CG_Player);
+    void playerPing(QWebSocket * socket, quint64 ping, quint64 g_id, QString name);
 
 public slots:
     // DATABASE SLOTS
@@ -58,19 +59,22 @@ public slots:
     void sendAddUserReply(QWebSocket * socket,bool added, int reason);
     void userDataSet(QWebSocket * socket,CG_User user);
     void refreshUserData(QWebSocket * socket,QString meta, CG_User user);
+
     // LOBY MANAGER SLOTS
     void sendLobbyData(QWebSocket* socket, QByteArray list);
     void sendConnectedToMatchMaking(QWebSocket * socket, QString type);
 
     // GAME MANAGER SLOTS
     void sendMatchedPlayer(QWebSocket * socket, QJsonObject player_data);
-    void sendSynchronizeGame(QWebSocket* socket, int state);
-    void sendPlayerMadeMove(QWebSocket * socket, int from, int to, QString fen, QString promote);
+    void sendSynchronizeGame(QWebSocket* socket, int state, quint64 time);
+    void sendPlayerMadeMove(QWebSocket * socket, int from, int to, QString fen, QString promote, quint64 time);
     void sendReturnMatches(QWebSocket* socket, QString match_data);
     void sendPlayerPostGame(QWebSocket* socket, QString post_data);
     void sendOpponentUpdate(QWebSocket* socket, QString data);
     void sendDraw(QWebSocket* socket, int draw);
 
+    // SERVER hertbeat
+    void socketPong(quint64 elapsed, const QByteArray& message);
 
 protected:
     QThread *                   m_dbThread;
@@ -108,6 +112,7 @@ protected slots:
     void playerDropped();
     void networkStateChanged(QNetworkSession::State state);
     void establishServer();
+
 #ifdef CG_TEST_ENABLED
 private slots:
     void testStartListen();

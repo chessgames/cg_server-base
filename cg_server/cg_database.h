@@ -58,7 +58,7 @@ signals:
 public slots:
     bool addUser(QWebSocket* socket, QString str_username, QByteArray pass, QString str_email, QString cg_data);
     bool userExists(QString str_username);
-    bool setUserData(QWebSocket * socket, QString name, QByteArray pass, QString data);
+    bool setUserData(QWebSocket * socket, QString name, QByteArray pass, QJsonObject data);
     bool updateUserRanking(QWebSocket* socket,QString name, int rank);
     void userRankings(QWebSocket * socket, QString name);
     void verifyUserCredentials(QWebSocket* socket, QString name, QByteArray hpass);
@@ -80,7 +80,7 @@ protected:
     bool puserExists(QString str_username);
     int  paddUser(QString str_username, QByteArray pass, QString str_email, QString cg_data);
     bool pemailExists(QString str_email);
-    bool psetUserData(QString name, QByteArray hpass, QString data, QString &meta, CG_User &user);
+    bool psetUserData(QString name, QByteArray hpass, QJsonObject &data, QString &meta, CG_User &user);
     int puserRankings(QString name);
     bool pupdateUserRanking(QString name, QString &meta, CG_User &user, int rank);
     bool pverifyUserCredentials(QString name, QByteArray pass, QString &meta, CG_User &user);

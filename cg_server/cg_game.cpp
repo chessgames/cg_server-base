@@ -8,8 +8,8 @@ CG_Game::CG_Game(CG_Player white, CG_Player black, quint64 time)
 
 
 CG_Game::CG_Game(const CG_Game &right)
-    :mBlack(right.mBlack), mWhite(right.mWhite),mBClock(right.mBClock),
-     mWClock(right.mWClock), mWResult(right.mWResult), mBResult(right.mBResult),
+    :mBlack(right.mBlack),mBClock(right.mBClock), mWhite(right.mWhite),
+     mWResult(right.mWResult), mWClock(right.mWClock), mBResult(right.mBResult),
      mWDraw(right.mWDraw), mBDraw(right.mBDraw),mValid(right.mValid), mCurrentState(right.mCurrentState)
 {}
 
@@ -35,24 +35,45 @@ CG_Player& CG_Game::black()
     return mBlack;
 }
 
+quint64 CG_Game::blackClock()
+{
+    return mBClock;
+}
+
 int CG_Game::blackResult(){
     return mBResult;
 }
 
-QWebSocket* CG_Game::makeMove(QWebSocket *socket, quint32 elapsed, QString fen)
+QWebSocket* CG_Game::makeMove(QWebSocket *socket, int elapsed, quint64 ping, QString fen, quint64 &out_time)
 {
-    QWebSocket* out;
+    int elapsed_s = mTurnTime.elapsed();
+    QWebSocket* out(nullptr);
     if(socket == mBlack.mWebSocket){
         out = mWhite.mWebSocket;
-        mWClock -= elapsed;
+        if(elapsed_s > ((ping*2) + elapsed + 300)){
+            mBClock -= (elapsed_s*.9); // adjusted elapsed
+        }
+        else
+        {
+            mBClock -= elapsed;// elapsed is within reason
+        }
+        out_time = mBClock;
         //obj["time"] = double(mWClock);
     }
     else{
         out = mBlack.mWebSocket;
-        mBClock -= elapsed;
+        if(elapsed_s > ((ping*2) +elapsed + 300)){
+            mWClock -= (elapsed_s *.9); // adjusted elapsed
+        }
+        else
+        {
+            mWClock -= elapsed;// elapsed is within reason
+        }
+        out_time = mWClock;
         //obj["time"] = double(mBClock);
     }
     mCurrentState = fen;
+    mTurnTime.start();
     return out;
 }
 
@@ -83,6 +104,9 @@ QJsonObject CG_Game::serialize()
     obj["spectators"] = mSpectators.count();
     obj["id"] = double(pair(quint64(mWhite.mWebSocket), quint64(mBlack.mWebSocket)));
     obj["fen"] = mCurrentState;
+    obj["wclock"] =  double(mWClock);
+    obj["bclock"] = double(mBClock);
+
     return obj;
 }
 
@@ -106,6 +130,7 @@ QWebSocket* CG_Game::setReady(QWebSocket *&socket)
         mBlack.mReady = true;
     }
     if(mBlack.mReady && mWhite.mReady){
+        mTurnTime.start();
         socket = mWhite.mWebSocket;
         return mBlack.mWebSocket;
     }
@@ -291,6 +316,11 @@ int CG_Game::setDraw(QWebSocket *socket, int draw)
 CG_Player& CG_Game::white()
 {
     return mWhite;
+}
+
+quint64 CG_Game::whiteClock()
+{
+    return mWClock;
 }
 
 int CG_Game::whiteResult()

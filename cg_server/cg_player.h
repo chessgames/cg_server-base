@@ -23,6 +23,7 @@ public:
     bool            mColor;
     QWebSocket*     mWebSocket;
     quint64         mGameID;
+    quint64         mLatency;
 };
 
 #endif // CG_PLAYER_H

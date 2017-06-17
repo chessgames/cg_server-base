@@ -3,7 +3,7 @@
 #include <QJsonObject>
 #include <QJsonArray>
 #include <QJsonDocument>
-
+#include <math.h>
 CG_GameManager::CG_GameManager(QObject *parent) : QObject(parent)
 {
 
@@ -21,29 +21,65 @@ int CG_GameManager::matchCount()
 
 
 void CG_GameManager::calculateEloChange(int result, int& elo, int& op_elo){
+
+    // Set K-Factor (i.e. this number determines how big the rating changes)
+     int K = 45;
+
+     // Calculate Elo from wikipedia formula
+     double Ea = 1/(1 + pow(10, ( (op_elo - elo)/400 ) ));
+     double Sa(0);
+     switch(result){
+         case -2:{
+             Sa = 0;
+             break;
+         }
+         case -1: {
+             Sa = 0;
+             break;
+         }
+         case 0:{
+             Sa = .5;
+             break;
+         }
+         case 1: {
+             Sa = 1;
+             break;
+         }
+         case 2: {
+             Sa = 1;
+             break;
+         }
+        default:break;
+     }
+     // Return new Elo (also on wikipedia)
+    elo = (elo + (int)(K*(Sa - Ea)));
+
+    Ea = 1/(1 + pow(10, ( (elo - op_elo)/400 ) ));
     switch(result){
         case -2:{
-            elo = -5;
-            op_elo = 5;
+            Sa = 1;
             break;
         }
         case -1: {
-            elo = -5;
-            op_elo = 5;
+            Sa = 1;
+            break;
+        }
+        case 0:{
+            Sa = .5;
             break;
         }
         case 1: {
-            elo = -5;
-            op_elo = 5;
+            Sa = 0;
             break;
         }
         case 2: {
-            elo = 5;
-            op_elo = -5;
+            Sa = 0;
             break;
         }
-    default: elo = 0; op_elo = 0;break;
+       default:break;
     }
+    op_elo = (op_elo + (int)(K*(Sa - Ea)));
+
 }
 
 void CG_GameManager::matchedGame(CG_Player black, CG_Player white, quint64 time)
@@ -92,17 +128,15 @@ CG_Game* CG_GameManager::findGame(QWebSocket *player)
 }
 
 
-void CG_GameManager::makeMove(QWebSocket *socket, quint64 id, int from, int to, QString fen, QString promote)
+void CG_GameManager::makeMove(QWebSocket *socket, quint64 id, int from, int to, QString fen, QString promote,int time, quint64 latency)
 {
-   // QJsonDocument doc = QJsonDocument::fromJson(move_data.toLocal8Bit());
-   // QJsonObject obj = doc.object();
-    //quint32 elapsed_time(obj.value("time").toInt());
     CG_Game *game(mGames.value(id));
-
-    QWebSocket * out(game->makeMove(socket, 4000, fen));
-    //game.makeMove(socket,elapsed_time,obj,out);
-    //doc.setObject(obj);
-    emit sendPlayerMadeMove(out,from,to,fen,promote);
+    quint64 out_time(0);
+    QWebSocket * out(game->makeMove(socket, time, latency, fen,out_time));
+    if(out != nullptr){
+        emit sendPlayerMadeMove(out,from,to,fen,promote,out_time); // move made
+        emit notifySynchronizedGame(socket,1,out_time); // synchronize time
+    }
 }
 
 
@@ -112,14 +146,14 @@ void CG_GameManager::playerDisconnected(QWebSocket *socket, quint64 id)
 }
 
 
-void CG_GameManager::sendGameReady(QWebSocket* socket, quint64 id)
+void CG_GameManager::sendGameReady(QWebSocket* socket, quint64 id, quint64 latency)
 {
     CG_Game *game(mGames.value(id));
     QWebSocket *other(nullptr);
     other = game->setReady(socket);
     if(other){
-        emit notifySynchronizedGame(socket, 0);  // 0 == start
-        emit notifySynchronizedGame(other, 0);  // 0 == start
+        emit notifySynchronizedGame(socket, 0,game->whiteClock());  // 0 == start
+        emit notifySynchronizedGame(other, 0,game->whiteClock());  // 0 == start
     }
 }
 

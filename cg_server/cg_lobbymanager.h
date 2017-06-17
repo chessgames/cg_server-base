@@ -21,7 +21,7 @@ signals:
 public slots:
     void fetchLobbyList(QWebSocket* socket);
     void joinMatchMaking(int type, CG_Player black);
-
+    void leaveMatchMaking(QWebSocket * socket);
 protected:
     QMap<QString,CG_Lobby>   mLobbies;
     QList<CG_Player>         mOneMinute;

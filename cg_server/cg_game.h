@@ -3,7 +3,7 @@
 
 #include "cg_player.h"
 #include <QWebSocket>
-
+#include <QTime>
 class CG_Game
 {
 public:
@@ -17,10 +17,12 @@ public:
     CG_Player& black();
     int whiteResult();
     int blackResult();
+    quint64 whiteClock();
+    quint64 blackClock();
     bool isValid();
     QWebSocket* otherSocket(QWebSocket * socket);
     QWebSocket *setReady(QWebSocket *&socket);
-    QWebSocket *makeMove(QWebSocket* socket,  quint32 elapsed, QString fen);
+    QWebSocket *makeMove(QWebSocket* socket,  int elapsed, quint64 ping, QString fen, quint64 &out_time);
     bool setResult(QWebSocket * socket, int result);
     int  setDraw(QWebSocket * socket, int draw);
     QJsonObject serialize();
@@ -35,6 +37,8 @@ protected:
     int                 mBDraw;
     quint64             mBClock;
     quint64             mWClock;
+    QTime               mTurnTime;
+    quint64             mLastLatency;
     QString             mCurrentState;
     QList<CG_Player>    mSpectators;
     CG_Player           mBlack;

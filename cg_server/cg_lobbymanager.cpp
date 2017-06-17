@@ -56,7 +56,26 @@ void CG_LobbyManager::joinMatchMaking(int type, CG_Player black)
     }
 }
 
-
+void CG_LobbyManager::leaveMatchMaking(QWebSocket *socket){
+    if(mOneMinute.size() > 0){
+        if(mOneMinute.at(0).mWebSocket == socket){
+            mOneMinute.takeFirst();
+            return;
+        }
+    }
+    if(mFiveMinute.size() > 0){
+        if(mFiveMinute.at(0).mWebSocket == socket){
+            mFiveMinute.takeFirst();
+            return;
+        }
+    }
+    if(mThirtyMinute.size() > 0){
+        if(mThirtyMinute.at(0).mWebSocket == socket){
+            mThirtyMinute.takeFirst();
+            return;
+        }
+    }
+}
 
 
 void CG_LobbyManager::sendPlayerInformation(QWebSocket *socket, CG_Player player, bool color)

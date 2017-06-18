@@ -107,7 +107,7 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
         {
             user_id = qry.value(0).toInt();
             qry.finish();
-            paddUserMatch(user_id);
+            paddUserMatch(user_id,0,0,0,"");
             qDebug() << "User Id found in DB @ "<< user_id <<" for " << str_username;
             return 0;
         }
@@ -115,15 +115,16 @@ int CG_Database::paddUser(QString str_username, QByteArray pass, QString str_ema
     return 3;
 }
 
-void CG_Database::paddUserMatch(int id)
+
+void CG_Database::paddUserMatch(double id, double total, double won, double date, QString last)
 {
     QSqlQuery qry( m_dbUser);
     qry.prepare( "INSERT INTO cg_match (id, total, won, date, last) VALUES(?, ?, ?, ?, ?);" );
     qry.addBindValue(id);
-    qry.addBindValue(0);
-    qry.addBindValue(0);
-    qry.addBindValue(0);
-    qry.addBindValue("");
+    qry.addBindValue(total);
+    qry.addBindValue(won);
+    qry.addBindValue(date);
+    qry.addBindValue(last);
     qry.exec();
 }
 
@@ -183,16 +184,14 @@ bool CG_Database::connectToDatabase()
 
 bool CG_Database::databaseExists()
 {
-    m_dbUser.setDatabaseName("CG_DB");
     m_dbUser.open();
     QSqlQuery query;
-    query.prepare("SELECT * FROM cg_user;");
-    if(query.exec() && query.next())
+    query.prepare("USE CG_DB;");
+    if(query.exec())
     {
         return true;
     }
     m_dbUser.close();
-    m_dbUser.setDatabaseName("");
     return false;
 }
 

@@ -52,7 +52,7 @@ void CG_GameManager::calculateEloChange(int result, int& elo, int& op_elo){
         default:break;
      }
      // Return new Elo (also on wikipedia)
-    elo = (elo + (int)(K*(Sa - Ea)));
+    int temp_elo = (elo + (int)(K*(Sa - Ea)));
 
     Ea = 1/(1 + pow(10, ( (elo - op_elo)/400 ) ));
     switch(result){
@@ -79,6 +79,7 @@ void CG_GameManager::calculateEloChange(int result, int& elo, int& op_elo){
        default:break;
     }
     op_elo = (op_elo + (int)(K*(Sa - Ea)));
+    elo = temp_elo;
 
 }
 
@@ -223,8 +224,8 @@ void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJso
             calculateEloChange(game->whiteResult(),elo_w,elo_b);
             emit updateLastGameDb(game->white().mUserData.id, elo_w, date, result_w);
             emit updateLastGameDb(game->black().mUserData.id, elo_b, date, result_b);
-            emit updatePlayerRank(game->white().mWebSocket,game->white().mUserData.username, game->white().mUserData.elo + elo_w);
-            emit updatePlayerRank(game->black().mWebSocket,game->black().mUserData.username,game->black().mUserData.elo +elo_b);
+            emit updatePlayerRank(game->white().mWebSocket,game->white().mUserData.username, elo_w);
+            emit updatePlayerRank(game->black().mWebSocket,game->black().mUserData.username, elo_b);
             emit notifyPlayerPostGame(game->white().mWebSocket, result_w);
             emit notifyPlayerPostGame(game->black().mWebSocket, result_b);
             game = mGames.take(id);

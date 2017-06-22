@@ -197,7 +197,7 @@ void CG_GameManager::sendDraw(QWebSocket *socket, int response, quint64 id)
 //    }
 }
 
-void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJsonObject move, QString fen, QString last)
+void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result,QString last)
 {
     if(mGames.contains(id)){
         CG_Game *game(mGames.value(id));
@@ -206,28 +206,39 @@ void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result, QJso
         quint64 date = QDateTime::currentSecsSinceEpoch();
         bool finished(game->setResult(socket,result));
         if(finished){ // tell clients of finished game
-            QJsonObject result_obj;
-            result_obj["move"] = move;
-            result_obj["fen"] = fen;
-            result_obj["game"] = last;
+            // the game is over so calculate the elo based on the result
             elo_w = game->white().mUserData.elo;
             elo_b = game->black().mUserData.elo;
-            QString result_w;
-            QJsonDocument doc;
-            QString result_b;
-            result_obj["result"] = game->whiteResult();
-            doc.setObject(result_obj);
-            result_w = doc.toJson();
-            result_obj["result"]  = game->blackResult();
-            doc.setObject(result_obj);
-            result_b = doc.toJson();
             calculateEloChange(game->whiteResult(),elo_w,elo_b);
-            emit updateLastGameDb(game->white().mUserData.id, elo_w, date, result_w);
-            emit updateLastGameDb(game->black().mUserData.id, elo_b, date, result_b);
+
+            // generate the response for black and white
+            QString output;
+            QJsonObject result_obj; // object to fill
+
+            // TODO generate PGNj for the game and store it
+            result_obj["game"] = last; // both share the game result
+            result_obj["result_w"] = game->whiteResult(); // whites result
+            result_obj["elo_w"] = elo_w;
+            result_obj["elo_b"] = elo_b;
+            result_obj["time_w"] = double(game->whiteClock());
+            result_obj["time_b"] = double(game->blackClock());
+            result_obj["result_b"]  = game->blackResult();
+
+            QJsonDocument doc;
+            doc.setObject(result_obj);
+            output = doc.toJson(); // write out whites result
+
+            // TODO: clean up efficiency of updating ranked match in DB
+            // update on the server
+            emit updateLastGameDb(game->white().mUserData.id, elo_w, date, output);
+            emit updateLastGameDb(game->black().mUserData.id, elo_b, date, output);
             emit updatePlayerRank(game->white().mWebSocket,game->white().mUserData.username, elo_w);
             emit updatePlayerRank(game->black().mWebSocket,game->black().mUserData.username, elo_b);
-            emit notifyPlayerPostGame(game->white().mWebSocket, result_w);
-            emit notifyPlayerPostGame(game->black().mWebSocket, result_b);
+            emit notifyPlayerPostGame(game->white().mWebSocket, output);
+            emit notifyPlayerPostGame(game->black().mWebSocket, output);
+
+
+            // clean up the game
             game = mGames.take(id);
             delete game;
         }

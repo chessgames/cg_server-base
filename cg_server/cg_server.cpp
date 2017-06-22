@@ -289,12 +289,10 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             break;
         }
         case SEND_RESULT:{
-            if(params.count() >= 4){
+            if(params.count() >= 2){
                 int      result(params.at(0).toInt());
-                QJsonObject move(params.at(1).toObject());
-                QString     fen(params.at(2).toString());
-                QString     last(params.at(3).toString());
-                m_gameManager.sendResult(socket,player.mGameID,result,move,fen,last);
+                QString     last(params.at(1).toString());
+                m_gameManager.sendResult(socket,player.mGameID,result,last);
             }
             break;
         }

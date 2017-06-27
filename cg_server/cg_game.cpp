@@ -138,103 +138,52 @@ QWebSocket* CG_Game::setReady(QWebSocket *&socket)
 }
 
 
-bool CG_Game::setResult(QWebSocket *socket, int result)
+bool CG_Game::setResult(QWebSocket *socket, int result, double white_t, double black_t, bool & draw)
 {
+    //  Results TABLE
+    //  Player Win (I Win by Checkmate)              : 1
+    //  Other Player Win (Won by checkmate)          : -1
+    //  Drawn by Agreement                           : 0
+    //  Drawn by Stalemate                           : 10
+    //  Drawn by 50 Move Rule                        : 11
+    //  Drawn by 3 Move Repetition                   : 12
+    //  Drawn by Lack of Material                    : 13
+    //          TODO: ADD LAM "book draws", "naked king + time"
+    //  My Time expired                              : 2
+    //  Opponents time expired                       : -2
+    //  Player Resigned                              : 3
+    //  Other Player Resigned                        : -3
+
+
     bool game_over(false);
     if(mWhite.mWebSocket == socket){ //set corresponding result
         mWResult = result;
-        switch(result){
-            case -5:{  // clearing result (game reset)
-                mBResult = -5;
-                mWResult = -5;
-                break;
-            }
-            case -1:{// lost (by checkmate)
-                if(mBResult == 1){
-                   game_over = true;
-                }
-                break;
-            }
-            case 0:{  //  draw stalemate
-                if(mBResult == 0){
-                    game_over = true;
-                }
-                break;
-            }
-            case 1:{   //  won (by checkmate)
-                if(mBResult == -1){
-                    game_over = true;
-                }
-                break;
-            }
-            case 2:{ // white resigned
-                mBResult = 2;
-                mWResult = -2;
-                game_over = true;
-                break;
-            }
-            case 3:{   // draw threefold
-                if(mBResult == 3){
-                    game_over = true;
-                }
-                break;
-            }
-            case 4:{  // draw inssuficient material
-                if(mBResult == 4){
-                    game_over = true;
-                }
-                break;
-            }
-        default: qDebug() << "Bad result received game " << this->mWhite.mGameID <<  " from " << this->mWhite.mUserData.username;
+        if(result == -3)
+        {
+            mBResult = 3; // won by resignation
         }
     }
     else{
         mBResult = result;
-        switch(result){
-            case -5:{  // clearing result (game reset)
-                mBResult = -5;
-                mWResult = -5;
-                break;
-            }
-            case -1:{// lost (by checkmate)
-                if(mWResult == 1){
-                   game_over = true;
-                }
-                break;
-            }
-            case 0:{  //  draw stalemate
-                if(mWResult == 0){
-                    game_over = true;
-                }
-                break;
-            }
-            case 1:{   //  won (by checkmate)
-                if(mWResult == -1){
-                    game_over = true;
-                }
-                break;
-            }
-            case 2:{ // black resigned
-                mWResult = 2;
-                mBResult = -2;
-                game_over = true;
-                break;
-            }
-            case 3:{   // draw threefold
-                if(mWResult == 3){
-                    game_over = true;
-                }
-                break;
-            }
-            case 4:{  // draw inssuficient material
-                if(mWResult == 4){
-                    game_over = true;
-                }
-                break;
-            }
-        default: qDebug() << "Bad result received game " << this->mBlack.mGameID <<  " from " << this->mBlack.mUserData.username;
+        if(result == -3)
+        {
+            mWResult = 3; // won by resignation
         }
     }
+
+    if(mWResult == mBResult){
+        game_over = true;
+        draw = true;
+        mBClock = black_t;
+        mWClock = white_t;
+    }
+    else if (mWResult == (mBResult * -1))
+    {
+        game_over = true;
+        mBClock = black_t;
+        mWClock = white_t;
+    }
+
     return game_over;
 }
 

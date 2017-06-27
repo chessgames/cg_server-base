@@ -37,7 +37,7 @@ public slots:
     void makeMove(QWebSocket * socket, quint64 id, int from, int to, QString fen, QString promote, int time, quint64 latency); // server request
     void sendGameReady(QWebSocket* socket, quint64 id, quint64 latency); // server request
     void chooseColor(QWebSocket * socket, quint64 id, bool color);
-    void sendResult(QWebSocket * socket, quint64 id, int result, QString last);
+    void sendResult(QWebSocket * socket, quint64 id, double white_t, double black_t, int result, QString last);
     void sendPlayerUpdate(QWebSocket * socket, QString meta, CG_User data);
     void checkPendingMatch(QWebSocket * socket, quint64 id);
     void playerDisconnected(QWebSocket * socket, quint64 id);
@@ -48,7 +48,7 @@ protected:
     QMap<quint64, CG_Game*>   mGames; // stored by their game rank (combined elo)
 
 
-    void calculateEloChange(int result, int& elo, int& op_elo);
+    void calculateEloChange(double result, int& elo, int& op_elo);
 
 };
 

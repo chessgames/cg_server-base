@@ -280,6 +280,10 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             }
             break;
         }
+        case CANCEL_MATCHING:{
+            m_lobbyManager.leaveMatchMaking(socket);
+            break;
+        }
         // GAME Messages
         case SEND_SYNC:{
             if(params.count() >= 1){
@@ -289,10 +293,12 @@ void CG_Server::incommingVerifiedMessage(QByteArray message)
             break;
         }
         case SEND_RESULT:{
-            if(params.count() >= 2){
+            if(params.count() >= 4){
                 int      result(params.at(0).toInt());
-                QString     last(params.at(1).toString());
-                m_gameManager.sendResult(socket,player.mGameID,result,last);
+                double   white_t(params.at(1).toDouble());
+                double   black_t(params.at(2).toDouble());
+                QString     last(params.at(3).toString());
+                m_gameManager.sendResult(socket,player.mGameID,white_t,black_t,result,last);
             }
             break;
         }
@@ -365,9 +371,8 @@ void CG_Server::playerClosing()
     if(player.mGameID > 0){
         m_gameManager.playerDisconnected(socket,player.mGameID);
     }
+    m_lobbyManager.leaveMatchMaking(socket);
     if(player.mConnectedLobbies.length() > 0){
-        // something mlobby
-        m_lobbyManager.leaveMatchMaking(socket);
     }
     switch(c){
         // handle different disconnect reasons.
@@ -554,7 +559,6 @@ void CG_Server::userVerified(QWebSocket *socket, bool verified, QString meta, CG
         else{
             player.mWebSocket = socket;
             player.mUserData = user;
-
         }
         m_connected.insert(socket,player);
         socket->disconnect();

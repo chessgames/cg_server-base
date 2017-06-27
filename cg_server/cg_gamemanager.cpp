@@ -20,67 +20,22 @@ int CG_GameManager::matchCount()
 }
 
 
-void CG_GameManager::calculateEloChange(int result, int& elo, int& op_elo){
+void CG_GameManager::calculateEloChange(double result, int& elo, int& op_elo)
+{
 
     // Set K-Factor (i.e. this number determines how big the rating changes)
-     int K = 45;
+    int K = 45;
 
-     // Calculate Elo from wikipedia formula
-     double Ea = 1/(1 + pow(10, ( (op_elo - elo)/400 ) ));
-     double Sa(0);
-     switch(result){
-         case -2:{
-             Sa = 0;
-             break;
-         }
-         case -1: {
-             Sa = 0;
-             break;
-         }
-         case 0:{
-             Sa = .5;
-             break;
-         }
-         case 1: {
-             Sa = 1;
-             break;
-         }
-         case 2: {
-             Sa = 1;
-             break;
-         }
-        default:break;
-     }
+    // Calculate Elo from wikipedia formula
+    double Ea = 1/(1 + pow(10, ( (op_elo - elo)/400 ) ));
+    double Sa(result);
      // Return new Elo (also on wikipedia)
-    int temp_elo = (elo + (int)(K*(Sa - Ea)));
+    int temp_elo = (elo + round(K*(Sa - Ea)));
 
     Ea = 1/(1 + pow(10, ( (elo - op_elo)/400 ) ));
-    switch(result){
-        case -2:{
-            Sa = 1;
-            break;
-        }
-        case -1: {
-            Sa = 1;
-            break;
-        }
-        case 0:{
-            Sa = .5;
-            break;
-        }
-        case 1: {
-            Sa = 0;
-            break;
-        }
-        case 2: {
-            Sa = 0;
-            break;
-        }
-       default:break;
-    }
-    op_elo = (op_elo + (int)(K*(Sa - Ea)));
+    Sa = 1- Sa; // adjust for opponents elo
+    op_elo = (op_elo + round(K*(Sa - Ea)));
     elo = temp_elo;
-
 }
 
 void CG_GameManager::matchedGame(CG_Player black, CG_Player white, quint64 time)
@@ -197,19 +152,31 @@ void CG_GameManager::sendDraw(QWebSocket *socket, int response, quint64 id)
 //    }
 }
 
-void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result,QString last)
+void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, double white_t, double black_t, int result,QString last)
 {
     if(mGames.contains(id)){
         CG_Game *game(mGames.value(id));
         int elo_w;
         int elo_b;
         quint64 date = QDateTime::currentSecsSinceEpoch();
-        bool finished(game->setResult(socket,result));
+        bool was_draw(false);
+        bool finished(game->setResult(socket,result,white_t,black_t,was_draw));
         if(finished){ // tell clients of finished game
             // the game is over so calculate the elo based on the result
             elo_w = game->white().mUserData.elo;
             elo_b = game->black().mUserData.elo;
-            calculateEloChange(game->whiteResult(),elo_w,elo_b);
+            result = game->whiteResult();
+            if(was_draw){
+                calculateEloChange(0.5,elo_w,elo_b);
+            }
+            else{
+                if(result > 0){
+                    calculateEloChange(1,elo_w,elo_b);
+                }
+                else{
+                    calculateEloChange(0,elo_w,elo_b);
+                }
+            }
 
             // generate the response for black and white
             QString output;
@@ -226,7 +193,7 @@ void CG_GameManager::sendResult(QWebSocket *socket, quint64 id, int result,QStri
 
             QJsonDocument doc;
             doc.setObject(result_obj);
-            output = doc.toJson(); // write out whites result
+            output = doc.toJson(); // serialize results
 
             // TODO: clean up efficiency of updating ranked match in DB
             // update on the server

@@ -23,7 +23,7 @@ public:
     QWebSocket* otherSocket(QWebSocket * socket);
     QWebSocket *setReady(QWebSocket *&socket);
     QWebSocket *makeMove(QWebSocket* socket,  int elapsed, quint64 ping, QString fen, quint64 &out_time);
-    bool setResult(QWebSocket * socket, int result);
+    bool setResult(QWebSocket * socket, int result, double white_t, double black_t, bool &draw);
     int  setDraw(QWebSocket * socket, int draw);
     QJsonObject serialize();
     QWebSocket * reconnectPlayer(const CG_Player &player, quint64 &id);
